@@ -100,27 +100,54 @@ function handleFileUploads($files, $risk_id, $section_type, $db) {
     return $uploaded_files;
 }
 
-// Handle comprehensive risk reporting
 if ($_POST && isset($_POST['submit_comprehensive_risk'])) {
     try {
         $db->beginTransaction();
         
         // Validation
-        if (empty($_POST['risk_name']) || empty($_POST['risk_description']) || empty($_POST['cause_of_risk'])) {
-            throw new Exception('Risk Name, Description, and Cause are required fields');
+        if (empty($_POST['risk_category']) || empty($_POST['risk_description']) || empty($_POST['cause_of_risk'])) {
+            throw new Exception('Risk Category, Description, and Cause are required fields');
+        }
+        
+        // Validate category-specific input
+        $category_value = null;
+        $category_description = null;
+        
+        switch($_POST['risk_category']) {
+            case 'Financial Exposure':
+            case 'Decrease in market share':
+            case 'Customer Experience':
+            case 'Fraud':
+            case 'Other':
+                if (empty($_POST['category_value']) || !is_numeric($_POST['category_value'])) {
+                    throw new Exception('Please enter a valid numeric value for this risk category');
+                }
+                $category_value = floatval($_POST['category_value']);
+                break;
+            case 'Compliance':
+            case 'Reputation':
+            case 'Operations':
+            case 'Networks':
+            case 'People':
+            case 'IT':
+                if (empty($_POST['category_description'])) {
+                    throw new Exception('Please provide a description for this risk category');
+                }
+                $category_description = $_POST['category_description'];
+                break;
         }
         
         $query = "INSERT INTO risk_incidents (
-            risk_name, risk_description, cause_of_risk, department, reported_by, risk_owner_id,
-            existing_or_new, to_be_reported_to_board, risk_category,
+            risk_category, category_value, category_description, risk_description, cause_of_risk, department, reported_by, risk_owner_id,
+            existing_or_new, to_be_reported_to_board,
             inherent_likelihood, inherent_consequence, inherent_rating,
             residual_likelihood, residual_consequence, residual_rating,
             treatment_action, controls_action_plans, target_completion_date,
             progress_update, treatment_status, risk_status,
             created_at, updated_at
         ) VALUES (
-            :risk_name, :risk_description, :cause_of_risk, :department, :reported_by, :risk_owner_id,
-            :existing_or_new, :to_be_reported_to_board, :risk_category,
+            :risk_category, :category_value, :category_description, :risk_description, :cause_of_risk, :department, :reported_by, :risk_owner_id,
+            :existing_or_new, :to_be_reported_to_board,
             :inherent_likelihood, :inherent_consequence, :inherent_rating,
             :residual_likelihood, :residual_consequence, :residual_rating,
             :treatment_action, :controls_action_plans, :target_completion_date,
@@ -129,15 +156,16 @@ if ($_POST && isset($_POST['submit_comprehensive_risk'])) {
         )";
         
         $stmt = $db->prepare($query);
-        $stmt->bindParam(':risk_name', $_POST['risk_name']);
+        $stmt->bindParam(':risk_category', $_POST['risk_category']);
+        $stmt->bindParam(':category_value', $category_value);
+        $stmt->bindParam(':category_description', $category_description);
         $stmt->bindParam(':risk_description', $_POST['risk_description']);
         $stmt->bindParam(':cause_of_risk', $_POST['cause_of_risk']);
         $stmt->bindParam(':department', $_POST['department']);
         $stmt->bindParam(':reported_by', $_SESSION['user_id']);
-        $stmt->bindParam(':risk_owner_id', $_SESSION['user_id']); // Auto-assign to self
+        $stmt->bindParam(':risk_owner_id', $_SESSION['user_id']);
         $stmt->bindParam(':existing_or_new', $_POST['existing_or_new']);
         $stmt->bindParam(':to_be_reported_to_board', $_POST['to_be_reported_to_board']);
-        $stmt->bindParam(':risk_category', $_POST['risk_category']);
         $stmt->bindParam(':inherent_likelihood', $_POST['inherent_likelihood']);
         $stmt->bindParam(':inherent_consequence', $_POST['inherent_consequence']);
         $stmt->bindParam(':inherent_rating', $_POST['inherent_rating']);
@@ -1076,9 +1104,36 @@ $all_notifications = getNotifications($db, $_SESSION['user_id']);
                         <i class="fas fa-search"></i> Section 1: Risk Identification
                     </div>
                     
+                    <!-- Replaced Risk Name with Risk Category dropdown -->
                     <div class="form-group">
-                        <label class="form-label">Risk Name *</label>
-                        <input type="text" name="risk_name" class="form-control" required placeholder="Enter a clear, concise risk name">
+                        <label class="form-label">Risk Category *</label>
+                        <select name="risk_category" id="risk_category" class="form-control" required onchange="showCategoryInput()">
+                            <option value="">Select Risk Category</option>
+                            <option value="Financial Exposure">Financial Exposure [Revenue, Operating Expenditure, Book value]</option>
+                            <option value="Decrease in market share">Decrease in market share</option>
+                            <option value="Customer Experience">Customer Experience</option>
+                            <option value="Compliance">Compliance</option>
+                            <option value="Reputation">Reputation</option>
+                            <option value="Fraud">Fraud</option>
+                            <option value="Operations">Operations (Business continuity)</option>
+                            <option value="Networks">Networks</option>
+                            <option value="People">People</option>
+                            <option value="IT">IT (Cybersecurity & Data Privacy)</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Added dynamic input field based on category selection -->
+                    <div id="category_input_container" style="display: none;">
+                        <div class="form-group" id="value_input" style="display: none;">
+                            <label class="form-label">Value/Amount *</label>
+                            <input type="number" name="category_value" class="form-control" step="0.01" placeholder="Enter numeric value">
+                        </div>
+                        
+                        <div class="form-group" id="description_input" style="display: none;">
+                            <label class="form-label">Description *</label>
+                            <textarea name="category_description" class="form-control" rows="3" placeholder="Provide detailed description"></textarea>
+                        </div>
                     </div>
                     
                     <div class="form-group">
@@ -1106,23 +1161,6 @@ $all_notifications = getNotifications($db, $_SESSION['user_id']);
                         </div>
                         
                         <div class="form-group">
-                            <label class="form-label">Risk Category *</label>
-                            <select name="risk_category" class="form-control" required>
-                                <option value="">Select Category</option>
-                                <option value="Strategic">Strategic</option>
-                                <option value="Operational">Operational</option>
-                                <option value="Financial">Financial</option>
-                                <option value="Compliance">Compliance</option>
-                                <option value="Technology">Technology</option>
-                                <option value="Reputational">Reputational</option>
-                                <option value="Environmental">Environmental</option>
-                                <option value="Human Resources">Human Resources</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="form-row">
-                        <div class="form-group">
                             <label class="form-label">Existing or New Risk *</label>
                             <select name="existing_or_new" class="form-control" required>
                                 <option value="">Select Type</option>
@@ -1130,7 +1168,9 @@ $all_notifications = getNotifications($db, $_SESSION['user_id']);
                                 <option value="Existing">Existing Risk</option>
                             </select>
                         </div>
-                        
+                    </div>
+                    
+                    <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Report to Board *</label>
                             <select name="to_be_reported_to_board" class="form-control" required>
@@ -1310,7 +1350,46 @@ $all_notifications = getNotifications($db, $_SESSION['user_id']);
             </div>
         </div>
     </div>
-    
+
+    <!-- Added JavaScript for dynamic form behavior -->
+    <script>
+    function showCategoryInput() {
+        const category = document.getElementById('risk_category').value;
+        const container = document.getElementById('category_input_container');
+        const valueInput = document.getElementById('value_input');
+        const descriptionInput = document.getElementById('description_input');
+        
+        // Hide all inputs first
+        container.style.display = 'none';
+        valueInput.style.display = 'none';
+        descriptionInput.style.display = 'none';
+        
+        // Clear previous values
+        document.querySelector('input[name="category_value"]').value = '';
+        document.querySelector('textarea[name="category_description"]').value = '';
+        
+        if (category) {
+            container.style.display = 'block';
+            
+            // Categories that require numeric values
+            const valueCategories = ['Financial Exposure', 'Decrease in market share', 'Customer Experience', 'Fraud', 'Other'];
+            
+            // Categories that require text descriptions
+            const descriptionCategories = ['Compliance', 'Reputation', 'Operations', 'Networks', 'People', 'IT'];
+            
+            if (valueCategories.includes(category)) {
+                valueInput.style.display = 'block';
+                document.querySelector('input[name="category_value"]').required = true;
+                document.querySelector('textarea[name="category_description"]').required = false;
+            } else if (descriptionCategories.includes(category)) {
+                descriptionInput.style.display = 'block';
+                document.querySelector('textarea[name="category_description"]').required = true;
+                document.querySelector('input[name="category_value"]').required = false;
+            }
+        }
+    }
+    </script>
+
     <script>
         // Risk rating calculation
         function calculateRating(type) {

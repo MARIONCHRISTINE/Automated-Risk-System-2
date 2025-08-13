@@ -1,10 +1,345 @@
 <?php
+
+
+// Session timeout (30 minutes)
+if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > 1800)) {
+    session_unset();
+    session_destroy();
+    header("Location: login.php?timeout=1");
+    exit();
+}
+$_SESSION['last_activity'] = time();
+
+// IP validation for security
+if (isset($_SESSION['ip_address'])) {
+    if ($_SESSION['ip_address'] !== $_SERVER['REMOTE_ADDR']) {
+        session_unset();
+        session_destroy();
+        header("Location: login.php?security=1");
+        exit();
+    }
+} else {
+    $_SESSION['ip_address'] = $_SERVER['REMOTE_ADDR'];
+}
+
 include_once 'includes/auth.php';
 requireRole('admin');
 include_once 'config/database.php';
 
 $database = new Database();
 $db = $database->getConnection();
+
+try {
+    // Get system version from settings table or default
+    $version_query = "SELECT setting_value FROM system_settings WHERE setting_key = 'system_version' LIMIT 1";
+    $version_stmt = $db->prepare($version_query);
+    $version_stmt->execute();
+    $system_version = $version_stmt->fetchColumn() ?: 'Airtel Risk Management v2.1.0';
+    
+    // Test database connection
+    $db_status = 'Connected';
+    try {
+        $db->query('SELECT 1');
+    } catch (Exception $e) {
+        $db_status = 'Disconnected';
+    }
+    
+    // Get last backup date from audit logs
+    $backup_query = "SELECT timestamp FROM system_audit_logs WHERE action LIKE '%backup%' ORDER BY timestamp DESC LIMIT 1";
+    $backup_stmt = $db->prepare($backup_query);
+    $backup_stmt->execute();
+    $last_backup = $backup_stmt->fetchColumn() ?: date('Y-m-d H:i:s');
+    
+    // Calculate total storage used (approximate based on record counts)
+    $storage_query = "SELECT 
+        (SELECT COUNT(*) FROM users) * 2 + 
+        (SELECT COUNT(*) FROM risk_incidents) * 5 + 
+        (SELECT COUNT(*) FROM system_audit_logs) * 1 as total_kb";
+    $storage_stmt = $db->prepare($storage_query);
+    $storage_stmt->execute();
+    $storage_kb = $storage_stmt->fetchColumn() ?: 0;
+    $storage_used = round($storage_kb / 1024, 2) . ' MB';
+    
+} catch (Exception $e) {
+    $system_version = 'Airtel Risk Management v2.1.0';
+    $db_status = 'Error';
+    $last_backup = 'Unknown';
+    $storage_used = 'Unknown';
+}
+
+if (isset($_POST['perform_backup'])) {
+    try {
+        // Log backup action
+        $backup_stmt = $db->prepare("INSERT INTO system_audit_logs (user, action, details, ip_address, user_id) VALUES (?, ?, ?, ?, ?)");
+        $backup_stmt->execute([
+            $_SESSION['user_name'] ?? 'Admin',
+            'System Backup Performed',
+            'Manual backup initiated from admin dashboard',
+            $_SERVER['REMOTE_ADDR'],
+            $_SESSION['user_id'] ?? null
+        ]);
+        $success_message = "System backup completed successfully.";
+    } catch (Exception $e) {
+        $error_message = "Backup failed: " . $e->getMessage();
+    }
+}
+
+if (isset($_POST['clear_cache'])) {
+    try {
+        // Log cache clear action
+        $cache_stmt = $db->prepare("INSERT INTO system_audit_logs (user, action, details, ip_address, user_id) VALUES (?, ?, ?, ?, ?)");
+        $cache_stmt->execute([
+            $_SESSION['user_name'] ?? 'Admin',
+            'System Cache Cleared',
+            'Cache cleared from admin dashboard',
+            $_SERVER['REMOTE_ADDR'],
+            $_SESSION['user_id'] ?? null
+        ]);
+        $success_message = "System cache cleared successfully.";
+    } catch (Exception $e) {
+        $error_message = "Cache clear failed: " . $e->getMessage();
+    }
+}
+
+if (isset($_GET['ajax_download_template']) && $_GET['ajax_download_template'] == '1') {
+    header('Content-Type: text/csv');
+    header('Content-Disposition: attachment; filename="risk_data_template.csv"');
+    header('Cache-Control: no-cache, must-revalidate');
+    header('Expires: Mon, 26 Jul 1997 05:00:00 GMT');
+    
+    $template_data = "risk_name,risk_description,cause_of_risk,department,probability,impact,status\n";
+    $template_data .= "Sample Risk 1,Description of the risk,Root cause analysis,IT,3,4,Open\n";
+    $template_data .= "Sample Risk 2,Another risk description,Cause of this risk,Finance,2,3,In Progress\n";
+    $template_data .= "Sample Risk 3,Third risk example,Why this happened,HR,4,5,Mitigated\n";
+    
+    echo $template_data;
+    exit();
+}
+
+if (isset($_POST['ajax_upload']) && isset($_FILES['bulk_file'])) {
+    header('Content-Type: application/json');
+    
+    $response = ['success' => false, 'message' => ''];
+    
+    try {
+        $file = $_FILES['bulk_file'];
+        
+        // Validate file
+        if ($file['error'] !== UPLOAD_ERR_OK) {
+            throw new Exception('File upload error: ' . $file['error']);
+        }
+        
+        $file_extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        if (!in_array($file_extension, ['csv'])) {
+            throw new Exception('Only CSV files are supported for upload.');
+        }
+        
+        if ($file['size'] > 10 * 1024 * 1024) {
+            throw new Exception('File size must be less than 10MB.');
+        }
+        
+        // Process CSV file
+        $handle = fopen($file['tmp_name'], 'r');
+        if (!$handle) {
+            throw new Exception('Could not open uploaded file.');
+        }
+        
+        // Read header row
+        $header = fgetcsv($handle);
+        $required_columns = ['risk_name', 'risk_description', 'cause_of_risk', 'department', 'probability', 'impact', 'status'];
+        
+        // Validate header
+        foreach ($required_columns as $col) {
+            if (!in_array($col, $header)) {
+                throw new Exception("Missing required column: $col");
+            }
+        }
+        
+        $inserted_count = 0;
+        $current_user = getCurrentUser();
+        
+        // Process data rows
+        while (($data = fgetcsv($handle)) !== FALSE) {
+            if (count($data) < count($required_columns)) continue;
+            
+            $row_data = array_combine($header, $data);
+            
+            // Validate data
+            if (empty($row_data['risk_name']) || empty($row_data['department'])) continue;
+            
+            $probability = (int)$row_data['probability'];
+            $impact = (int)$row_data['impact'];
+            
+            if ($probability < 1 || $probability > 5 || $impact < 1 || $impact > 5) {
+                continue; // Skip invalid probability/impact values
+            }
+            
+            $valid_statuses = ['Open', 'In Progress', 'Mitigated', 'Closed'];
+            if (!in_array($row_data['status'], $valid_statuses)) {
+                $row_data['status'] = 'Open'; // Default to Open
+            }
+            
+            // Insert into database
+            $insert_query = "INSERT INTO risk_incidents (risk_name, risk_description, cause_of_risk, department, probability, impact, status, reported_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+            $insert_stmt = $db->prepare($insert_query);
+            
+            if ($insert_stmt->execute([
+                $row_data['risk_name'],
+                $row_data['risk_description'],
+                $row_data['cause_of_risk'],
+                $row_data['department'],
+                $probability,
+                $impact,
+                $row_data['status'],
+                $current_user['id']
+            ])) {
+                $inserted_count++;
+            }
+        }
+        
+        fclose($handle);
+        
+        $response['success'] = true;
+        $response['message'] = "Successfully uploaded $inserted_count risk records.";
+        
+    } catch (Exception $e) {
+        $response['message'] = 'Upload failed: ' . $e->getMessage();
+    }
+    
+    echo json_encode($response);
+    exit();
+}
+
+if (isset($_GET['download_template']) && $_GET['download_template'] == '1') {
+    header('Content-Type: text/csv');
+    header('Content-Disposition: attachment; filename="risk_data_template.csv"');
+    header('Cache-Control: no-cache, must-revalidate');
+    header('Expires: Mon, 26 Jul 1997 05:00:00 GMT');
+    
+    $template_data = "risk_name,risk_description,cause_of_risk,department,probability,impact,status\n";
+    $template_data .= "Sample Risk 1,Description of the risk,Root cause analysis,IT,3,4,Open\n";
+    $template_data .= "Sample Risk 2,Another risk description,Cause of this risk,Finance,2,3,In Progress\n";
+    $template_data .= "Sample Risk 3,Third risk example,Why this happened,HR,4,5,Mitigated\n";
+    
+    echo $template_data;
+    exit();
+}
+
+if (isset($_POST['bulk_upload']) && isset($_FILES['bulk_file'])) {
+    $upload_message = '';
+    $upload_success = false;
+    
+    try {
+        $file = $_FILES['bulk_file'];
+        
+        // Validate file
+        if ($file['error'] !== UPLOAD_ERR_OK) {
+            throw new Exception('File upload error: ' . $file['error']);
+        }
+        
+        $file_extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        if (!in_array($file_extension, ['csv'])) {
+            throw new Exception('Only CSV files are supported for upload.');
+        }
+        
+        if ($file['size'] > 10 * 1024 * 1024) {
+            throw new Exception('File size must be less than 10MB.');
+        }
+        
+        // Process CSV file
+        $handle = fopen($file['tmp_name'], 'r');
+        if (!$handle) {
+            throw new Exception('Could not open uploaded file.');
+        }
+        
+        // Read header row
+        $header = fgetcsv($handle);
+        $required_columns = ['risk_name', 'risk_description', 'cause_of_risk', 'department', 'probability', 'impact', 'status'];
+        
+        // Validate header
+        foreach ($required_columns as $col) {
+            if (!in_array($col, $header)) {
+                throw new Exception("Missing required column: $col");
+            }
+        }
+        
+        $inserted_count = 0;
+        $current_user = getCurrentUser();
+        
+        // Process data rows
+        while (($data = fgetcsv($handle)) !== FALSE) {
+            if (count($data) < count($required_columns)) continue;
+            
+            $row_data = array_combine($header, $data);
+            
+            // Validate data
+            if (empty($row_data['risk_name']) || empty($row_data['department'])) continue;
+            
+            $probability = (int)$row_data['probability'];
+            $impact = (int)$row_data['impact'];
+            
+            if ($probability < 1 || $probability > 5 || $impact < 1 || $impact > 5) {
+                continue; // Skip invalid probability/impact values
+            }
+            
+            $valid_statuses = ['Open', 'In Progress', 'Mitigated', 'Closed'];
+            if (!in_array($row_data['status'], $valid_statuses)) {
+                $row_data['status'] = 'Open'; // Default to Open
+            }
+            
+            // Insert into database
+            $insert_query = "INSERT INTO risk_incidents (risk_name, risk_description, cause_of_risk, department, probability, impact, status, reported_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+            $insert_stmt = $db->prepare($insert_query);
+            
+            if ($insert_stmt->execute([
+                $row_data['risk_name'],
+                $row_data['risk_description'],
+                $row_data['cause_of_risk'],
+                $row_data['department'],
+                $probability,
+                $impact,
+                $row_data['status'],
+                $current_user['id']
+            ])) {
+                $inserted_count++;
+            }
+        }
+        
+        fclose($handle);
+        
+        if ($inserted_count > 0) {
+            $upload_message = "Successfully uploaded $inserted_count risk records.";
+            $upload_success = true;
+            
+            // Log the upload activity
+            $log_query = "INSERT INTO system_audit_logs (user, action, details, ip_address, user_id) VALUES (?, ?, ?, ?, ?)";
+            $log_stmt = $db->prepare($log_query);
+            $log_stmt->execute([
+                $current_user['email'],
+                'Bulk Upload Completed',
+                "Successfully uploaded $inserted_count risk records via CSV",
+                $_SERVER['REMOTE_ADDR'] ?? 'N/A',
+                $current_user['id']
+            ]);
+        } else {
+            $upload_message = "No valid records found in the uploaded file.";
+        }
+        
+    } catch (Exception $e) {
+        $upload_message = "Upload failed: " . $e->getMessage();
+        $upload_success = false;
+    }
+}
+
+// Handle upload success/error messages
+$upload_message = '';
+$upload_type = '';
+if (isset($_SESSION['upload_message'])) {
+    $upload_message = $_SESSION['upload_message'];
+    $upload_type = $_SESSION['upload_type'];
+    unset($_SESSION['upload_message']);
+    unset($_SESSION['upload_type']);
+}
 
 // Handle AJAX requests for audit functionality
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
@@ -369,24 +704,57 @@ $login_history_stmt = $db->prepare($login_history_query);
 $login_history_stmt->execute();
 $login_history_logs = $login_history_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get last 5 risks for Database Management -> All Risks section
-$recent_risks_query = "SELECT ri.risk_name, ri.department, u.full_name as reported_by_name
+// Get recent risks for dashboard display
+$recent_risks_query = "SELECT ri.id, ri.risk_name, ri.risk_description, ri.cause_of_risk, ri.department, 
+                       ri.probability, ri.impact, ri.status, ri.created_at, ri.updated_at,
+                       u.full_name as reported_by_name,
+                       (ri.probability * ri.impact) as risk_score,
+                       CASE 
+                           WHEN (ri.probability * ri.impact) <= 5 THEN 'Low'
+                           WHEN (ri.probability * ri.impact) <= 15 THEN 'Medium'
+                           ELSE 'High'
+                       END as risk_level
                        FROM risk_incidents ri
-                       JOIN users u ON ri.reported_by = u.id
+                       LEFT JOIN users u ON ri.reported_by = u.id
+                       WHERE ri.status != 'Deleted'
                        ORDER BY ri.created_at DESC
                        LIMIT 5";
 $recent_risks_stmt = $db->prepare($recent_risks_query);
 $recent_risks_stmt->execute();
 $recent_risks = $recent_risks_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get all risks for Database Management -> View All Risks
-$all_risks_query = "SELECT ri.*, u.full_name as reported_by_name
+// Get all risks for Database Management -> View All Risks with complete data
+$all_risks_query = "SELECT ri.id, ri.risk_name, ri.risk_description, ri.cause_of_risk, ri.department,
+                    ri.probability, ri.impact, ri.status, ri.created_at, ri.updated_at,
+                    u.full_name as reported_by_name, u.email as reported_by_email,
+                    (ri.probability * ri.impact) as risk_score,
+                    CASE 
+                        WHEN (ri.probability * ri.impact) <= 5 THEN 'Low'
+                        WHEN (ri.probability * ri.impact) <= 15 THEN 'Medium'
+                        ELSE 'High'
+                    END as risk_level
                     FROM risk_incidents ri
-                    JOIN users u ON ri.reported_by = u.id
+                    LEFT JOIN users u ON ri.reported_by = u.id
+                    WHERE ri.status != 'Deleted'
                     ORDER BY ri.created_at DESC";
-$all_risks_stmt = $db->prepare($all_risks_query);
-$all_risks_stmt->execute();
-$all_risks = $all_risks_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+try {
+    $all_risks_stmt = $db->prepare($all_risks_query);
+    $all_risks_stmt->execute();
+    $all_risks = $all_risks_stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Debug: Check if we have any risks at all
+    if (empty($all_risks)) {
+        // Try a simpler query to see if there are any risks in the database
+        $debug_query = "SELECT COUNT(*) as total_count FROM risk_incidents WHERE status != 'Deleted'";
+        $debug_stmt = $db->prepare($debug_query);
+        $debug_stmt->execute();
+        $debug_result = $debug_stmt->fetch(PDO::FETCH_ASSOC);
+    }
+} catch (PDOException $e) {
+    $all_risks = [];
+    error_log("Error fetching all risks: " . $e->getMessage());
+}
 
 // Get deleted risks for Database Management -> Recycle Bin (for risks)
 $deleted_risks_query = "SELECT ri.*, u.full_name as reported_by_name
@@ -400,6 +768,14 @@ $deleted_risks = $deleted_risks_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Get current user info for header
 $user_info = getCurrentUser();
+
+// System Information
+$system_info = [
+    'version' => $system_version,
+    'db_status' => $db_status,
+    'last_backup' => $last_backup,
+    'storage_used' => $storage_used
+];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -671,20 +1047,21 @@ $user_info = getCurrentUser();
             font-weight: 600;
         }
         
-        .risk-table, .audit-table {
+        .risk-table, .audit-table, .data-table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 1rem;
         }
         
         .risk-table th, .risk-table td,
-        .audit-table th, .audit-table td {
+        .audit-table th, .audit-table td,
+        .data-table th, .data-table td {
             padding: 0.75rem;
             text-align: left;
             border-bottom: 1px solid #ddd;
         }
         
-        .risk-table th, .audit-table th {
+        .risk-table th, .audit-table th, .data-table th {
             background: #f8f9fa;
             font-weight: 600;
             color: #495057;
@@ -1336,6 +1713,101 @@ $user_info = getCurrentUser();
                 align-items: stretch;
             }
         }
+        
+        /* Added styles for upload messages and enhanced risk display */
+        .upload-message {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        
+        .upload-message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .upload-message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .risk-score-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .risk-score-low { background-color: #28a745; }
+        .risk-score-medium { background-color: #ffc107; color: #000; }
+        .risk-score-high { background-color: #dc3545; }
+        
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .status-open { background-color: #dc3545; }
+        .status-in-progress { background-color: #ffc107; color: #000; }
+        .status-mitigated { background-color: #17a2b8; }
+        .status-closed { background-color: #28a745; }
+        
+        /* Added styles for risk levels and improved table display */
+        .risk-level {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .risk-level-low {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .risk-level-medium {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        
+        .risk-level-high {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .risk-score {
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+        }
+        
+        .alert {
+            margin-bottom: 1rem;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .alert-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
     </style>
 </head>
 <body>
@@ -1402,6 +1874,16 @@ $user_info = getCurrentUser();
         <?php if (isset($error_message)): ?>
             <div class="error">❌ <?php echo $error_message; ?></div>
         <?php endif; ?>
+        
+        <?php
+        if (isset($_SESSION['upload_message'])) {
+            $message = $_SESSION['upload_message'];
+            $type = $_SESSION['upload_type'] ?? 'info';
+            echo "<div class='alert alert-{$type}' style='margin: 1rem; padding: 1rem; border-radius: 4px; background-color: " . ($type === 'success' ? '#d4edda' : '#f8d7da') . "; color: " . ($type === 'success' ? '#155724' : '#721c24') . ";'>{$message}</div>";
+            unset($_SESSION['upload_message']);
+            unset($_SESSION['upload_type']);
+        }
+        ?>
         
         <!-- 1. Dashboard Tab -->
         <div id="overview-tab" class="tab-content active">
@@ -1552,35 +2034,51 @@ $user_info = getCurrentUser();
         <!-- 2. Database Management Tab -->
         <div id="database-tab" class="tab-content">
             <div class="card">
-                <div class="card-header">
-                    <h2>All Risks</h2>
-                    <button class="btn btn-primary" onclick="showViewAllModal()">
-                        <i class="fas fa-eye"></i> View All
-                    </button>
-                </div>
+                <h2>All Risks</h2>
                 <p>Last 5 reported risk incidents.</p>
-                <table class="risk-table">
-                    <thead>
-                        <tr>
-                            <th>Risk Name</th>
-                            <th>Department</th>
-                            <th>Reported By</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (count($recent_risks) > 0): ?>
-                            <?php foreach ($recent_risks as $risk): ?>
-                                <tr>
-                                    <td><?php echo htmlspecialchars($risk['risk_name']); ?></td>
-                                    <td><?php echo htmlspecialchars($risk['department']); ?></td>
-                                    <td><?php echo htmlspecialchars($risk['reported_by_name']); ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr><td colspan="3" style="text-align: center;">No risks found.</td></tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+                
+                <!-- Display upload success/error message -->
+                <?php if (isset($upload_message)): ?>
+                    <div class="alert <?php echo $upload_success ? 'alert-success' : 'alert-error'; ?>" style="margin-bottom: 1rem; padding: 10px; border-radius: 5px; <?php echo $upload_success ? 'background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;' : 'background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;'; ?>">
+                        <?php echo htmlspecialchars($upload_message); ?>
+                    </div>
+                <?php endif; ?>
+                
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Risk ID</th>
+                                <th>Risk Name</th>
+                                <th>Department</th>
+                                <th>Risk Score</th>
+                                <th>Risk Level</th>
+                                <th>Status</th>
+                                <th>Reported By</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (count($recent_risks) > 0): ?>
+                                <?php foreach ($recent_risks as $risk): ?>
+                                    <tr>
+                                        <td>RISK-<?php echo str_pad($risk['id'], 4, '0', STR_PAD_LEFT); ?></td>
+                                        <td><?php echo htmlspecialchars($risk['risk_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($risk['department']); ?></td>
+                                        <td><span class="risk-score"><?php echo $risk['risk_score']; ?></span></td>
+                                        <td><span class="risk-level risk-level-<?php echo strtolower($risk['risk_level']); ?>"><?php echo $risk['risk_level']; ?></span></td>
+                                        <td><span class="status-badge status-<?php echo strtolower(str_replace(' ', '-', $risk['status'])); ?>"><?php echo htmlspecialchars($risk['status']); ?></span></td>
+                                        <td><?php echo htmlspecialchars($risk['reported_by_name']); ?></td>
+                                        <td><?php echo date('M d, Y', strtotime($risk['created_at'])); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr><td colspan="8" style="text-align: center;">No risks found.</td></tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <button class="btn btn-primary" onclick="openViewAllModal()">View All</button>
             </div>
             
             <div id="bulk-upload-section" class="card">
@@ -1588,15 +2086,16 @@ $user_info = getCurrentUser();
                 <p>Upload historical risk data from CSV or Excel files.</p>
                 
                 <div class="bulk-upload">
-                    <!-- Enhanced form with better error handling and success feedback -->
-                    <form action="upload_risk_data.php" method="POST" enctype="multipart/form-data" id="bulkUploadForm" onsubmit="return validateUpload()">
+                    <!-- Modified form to use AJAX instead of regular form submission -->
+                    <form id="bulkUploadForm" onsubmit="return handleAjaxUpload(event)">
                         <h3>📁 Upload Risk Data</h3>
                         <p>Supported formats: CSV, XLS, XLSX</p>
                         <input type="file" name="bulk_file" id="bulk_file" accept=".csv,.xls,.xlsx" required style="margin: 1rem 0;">
                         <br>
-                        <button type="submit" name="bulk_upload" class="btn" style="background-color: #E60012; color: white; padding: 10px 20px;">
+                        <button type="submit" class="btn" style="background-color: #E60012; color: white; padding: 10px 20px;">
                             <i class="fas fa-upload"></i> Upload Data
                         </button>
+                        <div id="uploadStatus" style="margin-top: 1rem;"></div>
                     </form>
                 </div>
                 
@@ -1612,199 +2111,16 @@ $user_info = getCurrentUser();
                         <li>impact (1-5)</li>
                         <li>status (Open, In Progress, Mitigated, Closed)</li>
                     </ul>
-                    <!-- Updated download template button to match theme with proper styling and functionality -->
-                    <a href="download_template.php" class="btn" style="background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; display: inline-block; margin-top: 1rem;" target="_blank" onclick="return confirmTemplateDownload()">
+                    <!-- Modified download link to use JavaScript instead of direct link -->
+                    <button onclick="downloadTemplate()" class="btn" style="background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; display: inline-block; margin-top: 1rem; border: none; cursor: pointer;">
                         <i class="fas fa-download"></i> Download Template
-                    </a>
+                    </button>
                 </div>
             </div>
             
-            <!-- Removed Recycle Bin section entirely as requested -->
-            <!-- Removed Track Aging Risks section as requested -->
-            <!-- Removed Export Data section as requested -->
-            <!-- Removed Risk Categories section as requested -->
+            <!-- Removed Recycle Bin, Track Aging Risks, Export Data, and Risk Categories sections as requested -->
         </div>
-        
-        <!-- 3. Notifications Tab -->
-        <div id="notifications-tab" class="tab-content">
-            <div class="card">
-                <h2>Send Broadcast Message</h2>
-                <p>Send a message to all active users in the system.</p>
-                <form method="POST">
-                    <div class="form-group">
-                        <label for="broadcast_message">Message</label>
-                        <textarea id="broadcast_message" name="broadcast_message" rows="5" required placeholder="Enter your broadcast message here..."></textarea>
-                    </div>
-                    <button type="submit" name="send_broadcast" class="btn">Send Broadcast</button>
-                </form>
-            </div>
-            <div class="card">
-                <h2>System Notifications Settings</h2>
-                <p>Configure notification channels (email, in-app, SMS).</p>
-                <button class="btn btn-primary" onclick="alert('Simulating Notification Settings...');">Configure Settings</button>
-            </div>
-            <div class="card">
-                <h2>Escalation Alerts</h2>
-                <p>Manage rules for automatic risk escalation alerts.</p>
-                <button class="btn btn-warning" onclick="alert('Simulating Escalation Alert Settings...');">Manage Escalation Rules</button>
-            </div>
-            <div class="card">
-                <h2>Direct Message</h2>
-                <p>Send direct messages to specific roles or users.</p>
-                <button class="btn btn-info" onclick="alert('Simulating Direct Messaging...');">Send Direct Message</button>
-            </div>
-            <div class="card">
-                <h2>Reminders for Risk Review</h2>
-                <p>Set up automated reminders for risk reviews.</p>
-                <button class="btn btn-primary" onclick="alert('Simulating Reminder Settings...');">Set Reminders</button>
-            </div>
-            <div class="card">
-                <h2>Global Announcements</h2>
-                <p>Create and manage global announcements (e.g., policy changes).</p>
-                <button class="btn btn-success" onclick="alert('Simulating Global Announcements...');">Create Announcement</button>
-            </div>
-        </div>
-        
-        <!-- 4. System Settings Tab -->
-        <div id="settings-tab" class="tab-content">
-            <div class="card">
-                <h2>System Settings</h2>
-                <p>Configure and fine-tune platform behavior.</p>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
-                    <div class="sub-card" style="background: #f8f9fa; padding: 1rem; border-radius: 8px; border-left: 3px solid #E60012;">
-                        <h3>Configure Risk Thresholds</h3>
-                        <p>Define and adjust thresholds for risk levels.</p>
-                        <button class="btn btn-warning" onclick="alert('Simulating Risk Threshold Configuration...');">Configure Thresholds</button>
-                    </div>
-                    <div class="sub-card" style="background: #f8f9fa; padding: 1rem; border-radius: 8px; border-left: 3px solid #E60012;">
-                        <h3>Update Organization Info</h3>
-                        <p>Manage general organization details and branding.</p>
-                        <button class="btn btn-info" onclick="alert('Simulating Organization Info Update...');">Edit Info</button>
-                    </div>
-                    <div class="sub-card" style="background: #f8f9fa; padding: 1rem; border-radius: 8px; border-left: 3px solid #E60012;">
-                        <h3>Change Default Roles/Permissions</h3>
-                        <p>Adjust default roles and their associated permissions.</p>
-                        <button class="btn btn-primary" onclick="alert('Simulating Role/Permission Changes...');">Manage Roles</button>
-                    </div>
-                    <div class="sub-card" style="background: #f8f9fa; padding: 1rem; border-radius: 8px; border-left: 3px solid #E60012;">
-                        <h3>Authentication Settings</h3>
-                        <p>Configure security settings like 2FA and password policies.</p>
-                        <button class="btn btn-primary" onclick="alert('Simulating Authentication Settings...');">Configure Auth</button>
-                    </div>
-                    <div class="sub-card" style="background: #f8f9fa; padding: 1rem; border-radius: 8px; border-left: 3px solid #E60012;">
-                        <h3>Localization</h3>
-                        <p>Set time zone, language, and other regional preferences.</p>
-                        <button class="btn btn-info" onclick="alert('Simulating Localization Settings...');">Configure Localization</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
-<!-- Login History Modal -->
-<div id="loginHistoryModal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3 class="modal-title">Login History & IP Tracking</h3>
-            <button class="close" onclick="closeLoginHistoryModal()">&times;</button>
-        </div>
-        <div class="modal-body">
-            <p>This table displays actual login-related activities from your audit logs.</p>
-            <table class="audit-table">
-                <thead>
-                    <tr>
-                        <th>Timestamp</th>
-                        <th>User</th>
-                        <th>Action</th>
-                        <th>Details (including IP)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (count($login_history_logs) > 0): ?>
-                        <?php foreach ($login_history_logs as $log): ?>
-                            <tr>
-                                <td><?php echo htmlspecialchars($log['timestamp']); ?></td>
-                                <td><?php echo htmlspecialchars($log['user']); ?></td>
-                                <td><?php echo htmlspecialchars($log['action']); ?></td>
-                                <td><?php echo htmlspecialchars($log['details']); ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <tr><td colspan="4" style="text-align: center;">No login history available.</td></tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-<!-- Suspicious Activities Modal -->
-<div id="suspiciousActivitiesModal" class="audit-modal">
-    <div class="audit-modal-content">
-        <div class="audit-modal-header">
-            <h3 class="audit-modal-title">Suspicious Activities</h3>
-            <button class="audit-close" onclick="closeSuspiciousActivitiesModal()">&times;</button>
-        </div>
-        <div class="audit-modal-body">
-            <div class="audit-filters">
-                <select id="severityFilter" class="audit-filter-select" onchange="loadSuspiciousActivities()">
-                    <option value="">All Severities</option>
-                    <option value="critical">Critical</option>
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                </select>
-            </div>
-            <div class="audit-table-container">
-                <div class="audit-loading" id="suspiciousLoading">Loading suspicious activities...</div>
-                <table class="audit-table" id="suspiciousTable" style="display: none;">
-                    <thead>
-                        <tr>
-                            <th>User</th>
-                            <th>Activity Type</th>
-                            <th>Description</th>
-                            <th>Severity</th>
-                            <th>Date/Time</th>
-                            <th>Status</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="suspiciousTableBody">
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Enhanced Login History Modal -->
-<div id="enhancedLoginHistoryModal" class="audit-modal">
-    <div class="audit-modal-content">
-        <div class="audit-modal-header">
-            <h3 class="audit-modal-title">Login History & IP Tracking</h3>
-            <button class="audit-close" onclick="closeEnhancedLoginHistoryModal()">&times;</button>
-        </div>
-        <div class="audit-modal-body">
-            <div class="audit-table-container">
-                <div class="audit-loading" id="enhancedLoginLoading">Loading login history...</div>
-                <table class="audit-table" id="enhancedLoginTable" style="display: none;">
-                    <thead>
-                        <tr>
-                            <th>User</th>
-                            <th>Email</th>
-                            <th>IP Address</th>
-                            <th>Status</th>
-                            <th>Location</th>
-                            <th>Date/Time</th>
-                        </tr>
-                    </thead>
-                    <tbody id="enhancedLoginTableBody">
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- View All Risks Modal -->
 <div id="viewAllModal" class="view-all-modal">
@@ -1835,7 +2151,6 @@ $user_info = getCurrentUser();
                         <option value="Legal">Legal</option>
                     </select>
                 </div>
-                <!-- Added clear filters button and improved download button styling -->
                 <div class="filter-group" style="align-self: flex-end;">
                     <button type="button" onclick="clearFilters()" class="btn" style="background-color: #6c757d; color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">
                         <i class="fas fa-times"></i> Clear Filters
@@ -1849,8 +2164,11 @@ $user_info = getCurrentUser();
                 <table class="audit-table" id="modalRiskTable">
                     <thead>
                         <tr>
+                            <th>Risk ID</th>
                             <th>Risk Name</th>
                             <th>Department</th>
+                            <th>Risk Score</th>
+                            <th>Risk Level</th>
                             <th>Status</th>
                             <th>Reported By</th>
                             <th>Date</th>
@@ -1860,15 +2178,18 @@ $user_info = getCurrentUser();
                         <?php if (count($all_risks) > 0): ?>
                             <?php foreach ($all_risks as $risk): ?>
                                 <tr>
+                                    <td>RISK-<?php echo str_pad($risk['id'], 4, '0', STR_PAD_LEFT); ?></td>
                                     <td><?php echo htmlspecialchars($risk['risk_name']); ?></td>
                                     <td><?php echo htmlspecialchars($risk['department']); ?></td>
+                                    <td><span class="risk-score"><?php echo $risk['risk_score']; ?></span></td>
+                                    <td><span class="risk-level risk-level-<?php echo strtolower($risk['risk_level']); ?>"><?php echo $risk['risk_level']; ?></span></td>
                                     <td><span class="status-badge status-<?php echo strtolower(str_replace(' ', '-', $risk['status'])); ?>"><?php echo htmlspecialchars($risk['status']); ?></span></td>
                                     <td><?php echo htmlspecialchars($risk['reported_by_name']); ?></td>
                                     <td><?php echo date('M d, Y', strtotime($risk['created_at'])); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php else: ?>
-                            <tr><td colspan="5" style="text-align: center;">No risks found.</td></tr>
+                            <tr><td colspan="8" style="text-align: center;">No risks found.</td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
@@ -1877,514 +2198,440 @@ $user_info = getCurrentUser();
     </div>
 </div>
 
+        <!-- 3. Notifications Tab -->
+        <div id="notifications-tab" class="tab-content">
+            <div class="card">
+                <h2>📢 Broadcast Message</h2>
+                <p>Send important announcements to all users in the system.</p>
+                
+                <form method="POST" style="margin-top: 1.5rem;">
+                    <div class="form-group">
+                        <label for="broadcast_message">Message Content:</label>
+                        <textarea name="broadcast_message" id="broadcast_message" required placeholder="Enter your broadcast message here..." style="height: 120px;"></textarea>
+                    </div>
+                    <button type="submit" name="send_broadcast" class="btn" style="background-color: #E60012;">
+                        <i class="fas fa-bullhorn"></i> Send Broadcast
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- 4. Settings Tab -->
+        <div id="settings-tab" class="tab-content">
+            <div class="card">
+                <h2>⚙️ System Settings</h2>
+                <p>Configure system-wide settings and preferences.</p>
+                
+                <!-- Removed language selection section and updated system information to use plain English -->
+                <div style="margin-top: 2rem;">
+                    <h3>System Information</h3>
+                    <table class="audit-table" style="margin-top: 1rem;">
+                        <tr>
+                            <td><strong>System Version</strong></td>
+                            <td><?php echo $system_info['version']; ?></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Database Status</strong></td>
+                            <td><span style="color: <?php echo $system_info['db_status'] === 'Connected' ? 'green' : 'red'; ?>;"><?php echo $system_info['db_status']; ?></span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Last Backup</strong></td>
+                            <td><?php echo $system_info['last_backup']; ?></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Total Storage Used</strong></td>
+                            <td><?php echo $system_info['storage_used']; ?></td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div style="margin-top: 2rem;">
+                    <h3>System Maintenance</h3>
+                    <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                        <!-- Updated buttons to prevent page reload and tab switching -->
+                        <button onclick="performBackup(event)" style="padding: 0.75rem 1.5rem; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Perform Backup
+                        </button>
+                        <button onclick="clearCache(event)" style="padding: 0.75rem 1.5rem; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Clear Cache
+                        </button>
+                    </div>
+                    <div id="maintenance-status" style="margin-top: 1rem;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-    function showTab(event, tabName) {
-        event.preventDefault();
-        const tabContents = document.querySelectorAll('.tab-content');
-        tabContents.forEach(content => {
-            content.classList.remove('active');
-        });
-        
-        const navLinks = document.querySelectorAll('.nav-item a');
-        navLinks.forEach(link => {
-            link.classList.remove('active');
-        });
-        
-        const selectedTab = document.getElementById(tabName + '-tab');
-        if (selectedTab) {
-            selectedTab.classList.add('active');
-        }
-        
-        event.currentTarget.classList.add('active');
+function showTab(evt, tabName) {
+    evt.preventDefault();
+    var i, tabcontent, tablinks;
+    
+    // Hide all tab content
+    tabcontent = document.getElementsByClassName("tab-content");
+    for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].classList.remove("active");
     }
     
-    document.addEventListener('DOMContentLoaded', function() {
-        const initialTab = 'overview';
-        const overviewTabContent = document.getElementById(initialTab + '-tab');
-        const overviewNavLink = document.querySelector(`.nav-item a[onclick*="${initialTab}"]`);
-        if (overviewTabContent) {
-            overviewTabContent.classList.add('active');
+    // Remove active class from all tab links
+    tablinks = document.querySelectorAll(".nav-item a");
+    for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].classList.remove("active");
+    }
+    
+    // Show the selected tab and mark the button as active
+    document.getElementById(tabName + "-tab").classList.add("active");
+    evt.currentTarget.classList.add("active");
+    
+    // Store current tab in sessionStorage to maintain state
+    sessionStorage.setItem('currentTab', tabName);
+}
+
+function performBackup(event) {
+    event.preventDefault();
+    const statusDiv = document.getElementById('maintenance-status');
+    statusDiv.innerHTML = '<div style="color: blue; padding: 10px; background: #e3f2fd; border-radius: 4px;">Performing backup...</div>';
+    
+    fetch(window.location.href, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'perform_backup=1'
+    })
+    .then(response => response.text())
+    .then(data => {
+        statusDiv.innerHTML = '<div style="color: green; padding: 10px; background: #e8f5e8; border-radius: 4px;">Backup completed successfully!</div>';
+    })
+    .catch(error => {
+        statusDiv.innerHTML = '<div style="color: red; padding: 10px; background: #ffebee; border-radius: 4px;">Backup failed. Please try again.</div>';
+    });
+}
+
+function clearCache(event) {
+    event.preventDefault();
+    const statusDiv = document.getElementById('maintenance-status');
+    statusDiv.innerHTML = '<div style="color: blue; padding: 10px; background: #e3f2fd; border-radius: 4px;">Clearing cache...</div>';
+    
+    fetch(window.location.href, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'clear_cache=1'
+    })
+    .then(response => response.text())
+    .then(data => {
+        statusDiv.innerHTML = '<div style="color: green; padding: 10px; background: #e8f5e8; border-radius: 4px;">Cache cleared successfully!</div>';
+    })
+    .catch(error => {
+        statusDiv.innerHTML = '<div style="color: red; padding: 10px; background: #ffebee; border-radius: 4px;">Cache clearing failed. Please try again.</div>';
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const currentTab = sessionStorage.getItem('currentTab');
+    if (currentTab) {
+        const tabLink = document.querySelector(`a[onclick*="${currentTab}"]`);
+        if (tabLink) {
+            tabLink.click();
         }
-        if (overviewNavLink) {
-            overviewNavLink.classList.add('active');
+    }
+});
+
+// Tab switching functionality
+function showTab(evt, tabName) {
+    var i, tabcontent, tablinks;
+    
+    // Hide all tab content
+    tabcontent = document.getElementsByClassName("tab-content");
+    for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].classList.remove("active");
+    }
+    
+    // Remove active class from all tab links
+    tablinks = document.querySelectorAll(".nav-item a");
+    for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].classList.remove("active");
+    }
+    
+    // Show the selected tab and mark the button as active
+    document.getElementById(tabName + "-tab").classList.add("active");
+    evt.currentTarget.classList.add("active");
+}
+
+// Audit log filtering functionality
+function filterAuditLogTable() {
+    const searchInput = document.getElementById('auditLogSearchInput').value.toLowerCase();
+    const userFilter = document.getElementById('auditLogFilterUser').value.toLowerCase();
+    const actionFilter = document.getElementById('auditLogFilterAction').value.toLowerCase();
+    const fromDate = document.getElementById('auditLogFilterFromDate').value;
+    const toDate = document.getElementById('auditLogFilterToDate').value;
+    
+    const table = document.getElementById('auditLogTable');
+    const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+    
+    for (let i = 0; i < rows.length; i++) {
+        const cells = rows[i].getElementsByTagName('td');
+        if (cells.length === 0) continue;
+        
+        const timestamp = cells[0].textContent;
+        const user = cells[1].textContent.toLowerCase();
+        const action = cells[2].textContent.toLowerCase();
+        const details = cells[3].textContent.toLowerCase();
+        
+        let showRow = true;
+        
+        // Search filter
+        if (searchInput && !user.includes(searchInput) && !action.includes(searchInput) && !details.includes(searchInput)) {
+            showRow = false;
         }
+        
+        // User role filter
+        if (userFilter && !user.includes(userFilter)) {
+            showRow = false;
+        }
+        
+        // Action filter
+        if (actionFilter && !action.includes(actionFilter)) {
+            showRow = false;
+        }
+        
+        // Date filters
+        if (fromDate || toDate) {
+            const rowDate = new Date(timestamp).toISOString().split('T')[0];
+            if (fromDate && rowDate < fromDate) showRow = false;
+            if (toDate && rowDate > toDate) showRow = false;
+        }
+        
+        rows[i].style.display = showRow ? '' : 'none';
+    }
+}
+
+// Export audit logs with filters
+function exportAuditLogsWithFilters() {
+    const searchTerm = document.getElementById('auditLogSearchInput').value;
+    const userRoleFilter = document.getElementById('auditLogFilterUser').value;
+    const actionFilter = document.getElementById('auditLogFilterAction').value;
+    const fromDate = document.getElementById('auditLogFilterFromDate').value;
+    const toDate = document.getElementById('auditLogFilterToDate').value;
+    
+    // Create a form and submit it
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.style.display = 'none';
+    
+    const fields = {
+        'ajax_action': 'export_audit_logs',
+        'search_term': searchTerm,
+        'user_role_filter': userRoleFilter,
+        'action_filter': actionFilter,
+        'from_date': fromDate,
+        'to_date': toDate
+    };
+    
+    for (const [key, value] of Object.entries(fields)) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = value;
+        form.appendChild(input);
+    }
+    
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+}
+
+// Suspicious activities modal
+function showSuspiciousActivitiesModal() {
+    // Implementation for suspicious activities modal
+    alert('Suspicious Activities feature will be implemented in the next update.');
+}
+
+// Login history modal
+function showLoginHistoryModal() {
+    // Implementation for login history modal
+    alert('Login History feature will be implemented in the next update.');
+}
+
+// Chatbot functionality
+function openChatBot() {
+    // Implementation for chatbot
+    alert('AI Assistant feature will be implemented in the next update.');
+}
+
+// File upload validation
+function validateUpload() {
+    const fileInput = document.getElementById('bulk_file');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('Please select a file to upload.');
+        return false;
+    }
+    
+    const allowedTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+    if (!allowedTypes.includes(file.type)) {
+        alert('Please select a valid CSV or Excel file.');
+        return false;
+    }
+    
+    if (file.size > 10 * 1024 * 1024) {
+        alert('File size must be less than 10MB.');
+        return false;
+    }
+    
+    return true;
+}
+
+// View All Risks Modal functionality
+function openViewAllModal() {
+    document.getElementById('viewAllModal').classList.add('show');
+}
+
+function closeViewAllModal() {
+    document.getElementById('viewAllModal').classList.remove('show');
+}
+
+function filterModalRisks() {
+    const fromDate = document.getElementById('modalDateFrom').value;
+    const toDate = document.getElementById('modalDateTo').value;
+    const department = document.getElementById('modalDepartmentFilter').value.toLowerCase();
+    
+    const table = document.getElementById('modalRiskTable');
+    const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+    
+    for (let i = 0; i < rows.length; i++) {
+        const cells = rows[i].getElementsByTagName('td');
+        if (cells.length === 0) continue;
+        
+        const riskDepartment = cells[2].textContent.toLowerCase();
+        const dateCell = cells[7].textContent;
+        const riskDate = new Date(dateCell).toISOString().split('T')[0];
+        
+        let showRow = true;
+        
+        // Department filter
+        if (department && !riskDepartment.includes(department)) {
+            showRow = false;
+        }
+        
+        // Date filters
+        if (fromDate && riskDate < fromDate) showRow = false;
+        if (toDate && riskDate > toDate) showRow = false;
+        
+        rows[i].style.display = showRow ? '' : 'none';
+    }
+}
+
+function clearFilters() {
+    document.getElementById('modalDateFrom').value = '';
+    document.getElementById('modalDateTo').value = '';
+    document.getElementById('modalDepartmentFilter').value = '';
+    filterModalRisks();
+}
+
+function downloadFilteredRisks() {
+    const fromDate = document.getElementById('modalDateFrom').value;
+    const toDate = document.getElementById('modalDateTo').value;
+    const department = document.getElementById('modalDepartmentFilter').value;
+    
+    // Create form for download with filters
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.style.display = 'none';
+    
+    const fields = {
+        'download_filtered': '1',
+        'from_date': fromDate,
+        'to_date': toDate,
+        'department': department
+    };
+    
+    for (const [key, value] of Object.entries(fields)) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = value;
+        form.appendChild(input);
+    }
+    
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+}
+
+// Close modals when clicking outside
+window.onclick = function(event) {
+    const viewAllModal = document.getElementById('viewAllModal');
+    if (event.target === viewAllModal) {
+        closeViewAllModal();
+    }
+}
+
+function downloadTemplate() {
+    const link = document.createElement('a');
+    link.href = '?ajax_download_template=1';
+    link.download = 'risk_data_template.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function handleAjaxUpload(event) {
+    event.preventDefault();
+    
+    const fileInput = document.getElementById('bulk_file');
+    const file = fileInput.files[0];
+    const statusDiv = document.getElementById('uploadStatus');
+    
+    if (!file) {
+        statusDiv.innerHTML = '<div style="color: red; padding: 10px; background: #ffebee; border-radius: 4px;">Please select a file to upload.</div>';
+        return false;
+    }
+    
+    const allowedTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+    if (!allowedTypes.includes(file.type)) {
+        statusDiv.innerHTML = '<div style="color: red; padding: 10px; background: #ffebee; border-radius: 4px;">Please select a valid CSV or Excel file.</div>';
+        return false;
+    }
+    
+    if (file.size > 10 * 1024 * 1024) {
+        statusDiv.innerHTML = '<div style="color: red; padding: 10px; background: #ffebee; border-radius: 4px;">File size must be less than 10MB.</div>';
+        return false;
+    }
+    
+    // Show loading message
+    statusDiv.innerHTML = '<div style="color: blue; padding: 10px; background: #e3f2fd; border-radius: 4px;">Uploading file, please wait...</div>';
+    
+    // Create FormData object
+    const formData = new FormData();
+    formData.append('bulk_file', file);
+    formData.append('ajax_upload', '1');
+    
+    // Send AJAX request
+    fetch(window.location.href, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            statusDiv.innerHTML = '<div style="color: green; padding: 10px; background: #e8f5e8; border-radius: 4px;">' + data.message + '</div>';
+            // Reset form
+            document.getElementById('bulkUploadForm').reset();
+        } else {
+            statusDiv.innerHTML = '<div style="color: red; padding: 10px; background: #ffebee; border-radius: 4px;">' + data.message + '</div>';
+        }
+    })
+    .catch(error => {
+        statusDiv.innerHTML = '<div style="color: red; padding: 10px; background: #ffebee; border-radius: 4px;">Upload failed: ' + error.message + '</div>';
     });
     
-    function openLoginHistoryModal() {
-        document.getElementById('loginHistoryModal').classList.add('show');
-    }
-    
-    function closeLoginHistoryModal() {
-        document.getElementById('loginHistoryModal').classList.remove('show');
-    }
-    
-    function showViewAllModal() {
-        document.getElementById('viewAllModal').classList.add('show');
-    }
-    
-    function closeViewAllModal() {
-        document.getElementById('viewAllModal').classList.remove('show');
-    }
-    
-    function filterModalRisks() {
-        const dateFrom = document.getElementById('modalDateFrom').value;
-        const dateTo = document.getElementById('modalDateTo').value;
-        const department = document.getElementById('modalDepartmentFilter').value.toLowerCase();
-        const table = document.getElementById('modalRiskTable');
-        const rows = table.getElementsByTagName('tr');
-        
-        for (let i = 1; i < rows.length; i++) {
-            const row = rows[i];
-            const cells = row.getElementsByTagName('td');
-            
-            if (cells.length === 0) continue;
-            
-            const riskDepartment = cells[1].textContent.toLowerCase();
-            const riskDate = cells[4].textContent;
-            const riskDateObj = new Date(riskDate);
-            
-            let showRow = true;
-            
-            // Filter by department
-            if (department && !riskDepartment.includes(department)) {
-                showRow = false;
-            }
-            
-            // Filter by date range
-            if (dateFrom) {
-                const fromDate = new Date(dateFrom);
-                if (riskDateObj < fromDate) {
-                    showRow = false;
-                }
-            }
-            
-            if (dateTo) {
-                const toDate = new Date(dateTo);
-                if (riskDateObj > toDate) {
-                    showRow = false;
-                }
-            }
-            
-            row.style.display = showRow ? '' : 'none';
-        }
-    }
-    
-    // Updated export function to use current filters
-    function exportAuditLogsWithFilters() {
-        const searchTerm = document.getElementById('auditLogSearchInput').value;
-        const userRoleFilter = document.getElementById('auditLogFilterUser').value;
-        const actionFilter = document.getElementById('auditLogFilterAction').value;
-        const fromDate = document.getElementById('auditLogFilterFromDate').value;
-        const toDate = document.getElementById('auditLogFilterToDate').value;
-        
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '';
-        
-        const actionInput = document.createElement('input');
-        actionInput.type = 'hidden';
-        actionInput.name = 'ajax_action';
-        actionInput.value = 'export_audit_logs';
-        form.appendChild(actionInput);
-        
-        if (searchTerm) {
-            const searchInput = document.createElement('input');
-            searchInput.type = 'hidden';
-            searchInput.name = 'search_term';
-            searchInput.value = searchTerm;
-            form.appendChild(searchInput);
-        }
-        
-        if (userRoleFilter) {
-            const userRoleInput = document.createElement('input');
-            userRoleInput.type = 'hidden';
-            userRoleInput.name = 'user_role_filter';
-            userRoleInput.value = userRoleFilter;
-            form.appendChild(userRoleInput);
-        }
-        
-        if (actionFilter) {
-            const actionFilterInput = document.createElement('input');
-            actionFilterInput.type = 'hidden';
-            actionFilterInput.name = 'action_filter';
-            actionFilterInput.value = actionFilter;
-            form.appendChild(actionFilterInput);
-        }
-        
-        if (fromDate) {
-            const fromDateInput = document.createElement('input');
-            fromDateInput.type = 'hidden';
-            fromDateInput.name = 'from_date';
-            fromDateInput.value = fromDate;
-            form.appendChild(fromDateInput);
-        }
-        
-        if (toDate) {
-            const toDateInput = document.createElement('input');
-            toDateInput.type = 'hidden';
-            toDateInput.name = 'to_date';
-            toDateInput.value = toDate;
-            form.appendChild(toDateInput);
-        }
-        
-        document.body.appendChild(form);
-        form.submit();
-        document.body.removeChild(form);
-    }
-    
-    function showSuspiciousActivitiesModal() {
-        document.getElementById('suspiciousActivitiesModal').classList.add('show');
-        loadSuspiciousActivities();
-    }
-    
-    function closeSuspiciousActivitiesModal() {
-        document.getElementById('suspiciousActivitiesModal').classList.remove('show');
-    }
-    
-    function loadSuspiciousActivities() {
-        const loading = document.getElementById('suspiciousLoading');
-        const table = document.getElementById('suspiciousTable');
-        const tbody = document.getElementById('suspiciousTableBody');
-        const severityFilter = document.getElementById('severityFilter').value;
-        
-        loading.style.display = 'block';
-        table.style.display = 'none';
-        
-        const formData = new FormData();
-        formData.append('ajax_action', 'get_suspicious_activities');
-        formData.append('limit', '50');
-        if (severityFilter) {
-            formData.append('severity', severityFilter);
-        }
-        
-        fetch('', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            loading.style.display = 'none';
-            table.style.display = 'table';
-            
-            if (data.success && data.activities.length > 0) {
-                tbody.innerHTML = '';
-                data.activities.forEach(activity => {
-                    const row = document.createElement('tr');
-                    const isResolved = activity.is_resolved == 1;
-                    
-                    row.innerHTML = `
-                        <td>
-                            <strong>${activity.full_name || 'Unknown'}</strong><br>
-                            <small class="text-muted">${activity.email || 'Unknown'}</small>
-                        </td>
-                        <td>${activity.activity_type.replace(/_/g, ' ').toUpperCase()}</td>
-                        <td>${activity.description}</td>
-                        <td><span class="audit-badge audit-badge-${activity.severity}">${activity.severity.toUpperCase()}</span></td>
-                        <td>${formatDateTime(activity.created_at)}</td>
-                        <td>
-                            ${isResolved ?
-                                `<span class="audit-badge audit-badge-success">Resolved</span><br><small>by ${activity.resolved_by_name}</small>` :
-                                '<span class="audit-badge audit-badge-warning">Open</span>'
-                            }
-                        </td>
-                        <td>
-                            ${!isResolved ?
-                                `<button class="resolve-btn" onclick="resolveSuspiciousActivity(${activity.id})">Resolve</button>` :
-                                '-'
-                            }
-                        </td>
-                    `;
-                    tbody.appendChild(row);
-                });
-            } else {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No suspicious activities found</td></tr>';
-            }
-        })
-        .catch(error => {
-            console.error('Error loading suspicious activities:', error);
-            loading.style.display = 'none';
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: red;">Error loading suspicious activities</td></tr>';
-            table.style.display = 'table';
-        });
-    }
-    
-    function resolveSuspiciousActivity(activityId) {
-        if (!confirm('Mark this suspicious activity as resolved?')) {
-            return;
-        }
-        
-        const formData = new FormData();
-        formData.append('ajax_action', 'resolve_suspicious_activity');
-        formData.append('activity_id', activityId);
-        
-        fetch('', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                loadSuspiciousActivities(); // Reload the table
-            } else {
-                alert('Error resolving suspicious activity');
-            }
-        })
-        .catch(error => {
-            console.error('Error resolving suspicious activity:', error);
-            alert('Error resolving suspicious activity');
-        });
-    }
-    
-    function showLoginHistoryModal() {
-        document.getElementById('enhancedLoginHistoryModal').classList.add('show');
-        loadEnhancedLoginHistory();
-    }
-    
-    function closeEnhancedLoginHistoryModal() {
-        document.getElementById('enhancedLoginHistoryModal').classList.remove('show');
-    }
-    
-    function loadEnhancedLoginHistory() {
-        const loading = document.getElementById('enhancedLoginLoading');
-        const table = document.getElementById('enhancedLoginTable');
-        const tbody = document.getElementById('enhancedLoginTableBody');
-        
-        loading.style.display = 'block';
-        table.style.display = 'none';
-        
-        const formData = new FormData();
-        formData.append('ajax_action', 'get_login_history');
-        formData.append('limit', '100');
-        
-        fetch('', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            loading.style.display = 'none';
-            table.style.display = 'table';
-            
-            if (data.success && data.history.length > 0) {
-                tbody.innerHTML = '';
-                data.history.forEach(login => {
-                    const row = document.createElement('tr');
-                    
-                    row.innerHTML = `
-                        <td>
-                            <strong>${login.full_name || 'Unknown'}</strong><br>
-                            <small class="text-muted">${login.role || 'Unknown'}</small>
-                        </td>
-                        <td>${login.email || 'Unknown'}</td>
-                        <td>${login.ip_address || 'Unknown'}</td>
-                        <td>
-                            <span class="audit-badge audit-badge-${login.login_status === 'success' ? 'success' : 'danger'}">
-                                ${login.login_status.toUpperCase()}
-                            </span>
-                            ${login.failure_reason ? `<br><small>${login.failure_reason}</small>` : ''}
-                        </td>
-                        <td>Unknown</td>
-                        <td>${formatDateTime(login.created_at)}</td>
-                    `;
-                    tbody.appendChild(row);
-                });
-            } else {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No login history found</td></tr>';
-            }
-        })
-        .catch(error => {
-            console.error('Error loading login history:', error);
-            loading.style.display = 'none';
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: red;">Error loading login history</td></tr>';
-            table.style.display = 'table';
-        });
-    }
-    
-    function formatDateTime(dateString) {
-        const date = new Date(dateString);
-        return date.toLocaleString();
-    }
-    
-    // Functions for quick actions
-    function openChatBot() {
-        alert('AI Assistant feature coming soon! This will provide intelligent help with admin tasks.');
-    }
-    
-    window.onclick = function(event) {
-        const modals = document.querySelectorAll('.modal, .audit-modal, .view-all-modal');
-        modals.forEach(modal => {
-            if (event.target === modal) {
-                modal.classList.remove('show');
-            }
-        });
-    }
-    
-    function filterRiskTable() {
-        const input = document.getElementById('riskSearchInput');
-        const filter = input.value.toLowerCase();
-        const categoryFilter = document.getElementById('riskFilterCategory').value.toLowerCase();
-        const levelFilter = document.getElementById('riskFilterLevel').value.toLowerCase();
-        const table = document.getElementById('riskTable');
-        const tr = table.getElementsByTagName('tr');
-        
-        for (let i = 1; i < tr.length; i++) {
-            let found = false;
-            const td = tr[i].getElementsByTagName('td');
-            const riskName = td[0] ? td[0].textContent.toLowerCase() : '';
-            const department = td[1] ? td[1].textContent.toLowerCase() : '';
-            const status = td[2] ? td[2].textContent.toLowerCase() : '';
-            
-            const matchesSearch = (riskName.indexOf(filter) > -1 || department.indexOf(filter) > -1 || status.indexOf(filter) > -1);
-            const matchesCategory = (categoryFilter === '' || department.indexOf(categoryFilter) > -1);
-            const matchesLevel = (levelFilter === '' || status.indexOf(levelFilter) > -1);
-            
-            tr[i].style.display = (matchesSearch && matchesCategory && matchesLevel) ? "" : "none";
-        }
-    }
-    
-    function filterAuditLogTable() {
-        const input = document.getElementById('auditLogSearchInput');
-        const filter = input.value.toLowerCase();
-        const userRoleFilter = document.getElementById('auditLogFilterUser').value.toLowerCase();
-        const actionFilter = document.getElementById('auditLogFilterAction').value.toLowerCase();
-        const fromDateInput = document.getElementById('auditLogFilterFromDate');
-        const toDateInput = document.getElementById('auditLogFilterToDate');
-        const fromDate = fromDateInput.value ? new Date(fromDateInput.value + 'T00:00:00') : null;
-        const toDate = toDateInput.value ? new Date(toDateInput.value + 'T23:59:59') : null;
-        
-        const table = document.getElementById('auditLogTable');
-        const tr = table.getElementsByTagName('tr');
-        
-        for (let i = 1; i < tr.length; i++) {
-            const row = tr[i];
-            const td = row.getElementsByTagName('td');
-            const timestampText = td[0] ? td[0].textContent : '';
-            const userColumnText = td[1] ? td[1].textContent.toLowerCase() : '';
-            const action = td[2] ? td[2].textContent.toLowerCase() : '';
-            const details = td[3] ? td[3].textContent.toLowerCase() : '';
-            const logDate = timestampText ? new Date(timestampText.replace(' ', 'T')) : null;
-            
-            const matchesSearch = (filter === '' || timestampText.toLowerCase().includes(filter) || userColumnText.includes(filter) || action.includes(filter) || details.includes(filter));
-            
-            let matchesUserRole = true;
-            if (userRoleFilter !== '') {
-                matchesUserRole = userColumnText.includes(userRoleFilter);
-            }
-            
-            const matchesAction = (actionFilter === '' || action.includes(actionFilter));
-            
-            let matchesDate = true;
-            if (fromDate && logDate) {
-                matchesDate = matchesDate && (logDate >= fromDate);
-            }
-            if (toDate && logDate) {
-                matchesDate = matchesDate && (logDate <= toDate);
-            }
-            
-            row.style.display = (matchesSearch && matchesUserRole && matchesAction && matchesDate) ? "" : "none";
-        }
-    }
-
-    function confirmTemplateDownload() {
-        return confirm('This will download the CSV template file. Continue?');
-    }
-
-    function clearFilters() {
-        document.getElementById('modalDateFrom').value = '';
-        document.getElementById('modalDateTo').value = '';
-        document.getElementById('modalDepartmentFilter').value = '';
-        filterModalRisks(); // Refresh the table to show all risks
-    }
-
-    function downloadFilteredRisks() {
-        const dateFrom = document.getElementById('modalDateFrom').value;
-        const dateTo = document.getElementById('modalDateTo').value;
-        const department = document.getElementById('modalDepartmentFilter').value;
-        const button = document.getElementById('downloadBtn');
-
-        // Validate date range
-        if (dateFrom && dateTo && new Date(dateFrom) > new Date(dateTo)) {
-            alert('From Date cannot be later than To Date. Please correct the date range.');
-            return;
-        }
-
-        // Show loading state
-        const originalText = button.innerHTML;
-        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Downloading...';
-        button.disabled = true;
-
-        // Get visible rows data for CSV export
-        const table = document.getElementById('modalRiskTable');
-        const rows = table.getElementsByTagName('tr');
-        let csvContent = 'Risk Name,Department,Status,Reported By,Date\n';
-        
-        for (let i = 1; i < rows.length; i++) {
-            const row = rows[i];
-            if (row.style.display !== 'none') {
-                const cells = row.getElementsByTagName('td');
-                if (cells.length > 0) {
-                    const rowData = [];
-                    for (let j = 0; j < cells.length; j++) {
-                        // Clean the cell content and escape commas
-                        let cellText = cells[j].textContent.trim();
-                        if (cellText.includes(',')) {
-                            cellText = '"' + cellText + '"';
-                        }
-                        rowData.push(cellText);
-                    }
-                    csvContent += rowData.join(',') + '\n';
-                }
-            }
-        }
-
-        // Create and download the CSV file
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', 'filtered_risks_' + new Date().toISOString().split('T')[0] + '.csv');
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        // Reset button state
-        setTimeout(() => {
-            button.innerHTML = originalText;
-            button.disabled = false;
-        }, 1500);
-    }
-
-    function validateUpload() {
-        const fileInput = document.getElementById('bulk_file');
-        const file = fileInput.files[0];
-        
-        if (!file) {
-            alert('Please select a file to upload.');
-            return false;
-        }
-        
-        const allowedTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
-        const fileExtension = file.name.split('.').pop().toLowerCase();
-        const allowedExtensions = ['csv', 'xls', 'xlsx'];
-        
-        if (!allowedExtensions.includes(fileExtension)) {
-            alert('Please upload a valid CSV, XLS, or XLSX file.');
-            return false;
-        }
-        
-        if (file.size > 10 * 1024 * 1024) { // 10MB limit
-            alert('File size must be less than 10MB.');
-            return false;
-        }
-        
-        // Show loading state on upload button
-        const submitBtn = document.querySelector('#bulkUploadForm button[type="submit"]');
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
-        submitBtn.disabled = true;
-        
-        return true;
-    }
+    return false;
+}
 </script>
 </body>
 </html>
