@@ -1,6 +1,6 @@
 <?php
 include_once 'includes/auth.php';
-requireAnyRole(['risk_owner', 'admin', 'compliance_officer', 'compliance']); // Allow all roles
+requireAnyRole(['risk_owner', 'admin', 'compliance_team']); // Allow all roles
 include_once 'config/database.php';
 
 // Verify session data exists
@@ -102,17 +102,17 @@ try {
         $permanentChats = [
             'All Admins' => 'General discussion for all administrators',
             'Admins + Risk Owners' => 'Communication channel between admins and risk owners',
-            'Admins + Compliance' => 'Communication channel between admins and compliance team'
+            'Admins + Compliance_team' => 'Communication channel between admins and compliance team'
         ];
     } elseif ($_SESSION['role'] === 'risk_owner') {
         $permanentChats = [
             'All Risk Owners' => 'General discussion for all risk owners across departments',
             'Admins + Risk Owners' => 'Communication channel between admins and risk owners',
-            'Risk Owners + Compliance' => 'Communication channel with compliance team'
+            'Risk Owners + Compliance_team' => 'Communication channel with compliance team'
         ];
-    } elseif ($_SESSION['role'] === 'compliance_officer' || $_SESSION['role'] === 'compliance') {
+    } elseif ($_SESSION['role'] === 'compliance_team') {
         $permanentChats = [
-            'All Compliance' => 'General discussion for all compliance officers',
+            'All Compliance' => 'General discussion for all compliance team members',
             'Admins + Compliance' => 'Communication channel between admins and compliance team',
             'Risk Owners + Compliance' => 'Communication channel with risk owners'
         ];
@@ -327,13 +327,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             // Role-based filtering
             if ($_SESSION['role'] === 'admin') {
                 // Admins can message anyone
-                $whereClause .= " AND role != 'staff'";
+                $whereClause .= " AND role IN ('admin', 'risk_owner', 'compliance_team', 'compliance')";
             } elseif ($_SESSION['role'] === 'risk_owner') {
                 // Risk owners can message admins, other risk owners, and compliance
-                $whereClause .= " AND role IN ('admin', 'risk_owner', 'compliance_officer', 'compliance')";
+                $whereClause .= " AND role IN ('admin', 'risk_owner')";
             } elseif ($_SESSION['role'] === 'compliance_officer' || $_SESSION['role'] === 'compliance') {
                 // Compliance can message admins, risk owners, and other compliance officers
-                $whereClause .= " AND role IN ('admin', 'risk_owner', 'compliance_officer', 'compliance')";
+                $whereClause .= " AND role IN ('admin', 'risk_owner', 'compliance_team', 'compliance')";
             }
             
             if ($filter === 'risk_owners') {
@@ -536,7 +536,7 @@ if ($_SESSION['role'] === 'admin') {
     $roleBasedWhere = "AND (cr.name IN ('All Admins', 'Admins + Risk Owners', 'Admins + Compliance') OR cr.type = 'private')";
 } elseif ($_SESSION['role'] === 'risk_owner') {
     $roleBasedWhere = "AND (cr.name IN ('All Risk Owners', 'Admins + Risk Owners', 'Risk Owners + Compliance') OR cr.type = 'private')";
-} elseif ($_SESSION['role'] === 'compliance_officer' || $_SESSION['role'] === 'compliance') {
+} elseif ($_SESSION['role'] === 'compliance_team' || $_SESSION['role'] === 'compliance') {
     $roleBasedWhere = "AND (cr.name IN ('All Compliance', 'Admins + Compliance', 'Risk Owners + Compliance') OR cr.type = 'private')";
 }
 
@@ -570,7 +570,7 @@ foreach ($chat_rooms as $room) {
             $shouldJoin = in_array($room['name'], ['All Admins', 'Admins + Risk Owners', 'Admins + Compliance']);
         } elseif ($_SESSION['role'] === 'risk_owner') {
             $shouldJoin = in_array($room['name'], ['All Risk Owners', 'Admins + Risk Owners', 'Risk Owners + Compliance']);
-        } elseif ($_SESSION['role'] === 'compliance_officer' || $_SESSION['role'] === 'compliance') {
+        } elseif ($_SESSION['role'] === 'compliance_team' || $_SESSION['role'] === 'compliance') {
             $shouldJoin = in_array($room['name'], ['All Compliance', 'Admins + Compliance', 'Risk Owners + Compliance']);
         }
         
@@ -1691,9 +1691,9 @@ $private_chats = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             case 'risk_owner':
                                 $roleDisplay = 'Risk Owner';
                                 break;
-                            case 'compliance_officer':
+                            case 'compliance_team':
                             case 'compliance':
-                                $roleDisplay = 'Compliance Officer';
+                                $roleDisplay = 'Compliance Team';
                                 break;
                             default:
                                 $roleDisplay = ucfirst($_SESSION['role']);
@@ -1769,7 +1769,7 @@ $private_chats = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             💬 Team Chat
                         </a>
                     </li>
-                <?php elseif ($_SESSION['role'] === 'compliance_officer' || $_SESSION['role'] === 'compliance'): ?>
+                <?php elseif ($_SESSION['role'] === 'compliance_team' || $_SESSION['role'] === 'compliance'): ?>
                     <!-- Compliance Navigation -->
                     <li class="nav-item">
                         <a href="compliance_dashboard.php">
@@ -1961,7 +1961,7 @@ $private_chats = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <option value="admins">Administrators</option>
                             <option value="risk_owners">Risk Owners</option>
                             <option value="compliance">Compliance Team</option>
-                        <?php elseif ($_SESSION['role'] === 'compliance_officer' || $_SESSION['role'] === 'compliance'): ?>
+                        <?php elseif ($_SESSION['role'] === 'compliance_team' || $_SESSION['role'] === 'compliance'): ?>
                             <option value="admins">Administrators</option>
                             <option value="risk_owners">Risk Owners</option>
                             <option value="compliance">Compliance Team</option>

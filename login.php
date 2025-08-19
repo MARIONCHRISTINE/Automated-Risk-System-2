@@ -62,7 +62,7 @@ if ($_POST) {
                 case 'risk_owner':
                     header("Location: risk_owner_dashboard.php");
                     break;
-                case 'compliance':
+                case 'compliance_team':
                     header("Location: compliance_dashboard.php");
                     break;
                 case 'admin':
