@@ -121,3 +121,25 @@ For managing the My SQL database
 For source code versioning and collaboration
 
 
+
+
+
+
+Error
+SQL query: Copy
+
+
+CREATE TABLE IF NOT EXISTS `login_history` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) DEFAULT NULL,
+  `email` varchar(255) NOT NULL,
+  `ip_address` varchar(45) NOT NULL,
+  `user_agent` text DEFAULT NULL,
+  `login_status` enum('success','failed') NOT NULL,
+  `failure_reason` varchar(255) DEFAULT NULL,
+  `location_info` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL
+);
+MySQL said: Documentation
+
+#1075 - Incorrect table definition; there can be only one auto column and it must be defined as a key
+
