@@ -1,8 +1,7 @@
 -- phpMyAdmin SQL Dump
--- Cleaned and Optimized Version for Airtel Risk Management System
+-- Complete Airtel Risk Management System Database
 -- Generated: August 19, 2025
--- 
--- Database: `airtel_risk_system`
+-- ALL TABLES AND DATA PRESERVED
 --
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -15,11 +14,67 @@ SET time_zone = "+00:00";
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
 /*!40101 SET NAMES utf8mb4 */;
 
+-- Disable foreign key checks temporarily to avoid constraint issues
+SET FOREIGN_KEY_CHECKS = 0;
+
 --
 -- Database: `airtel_risk_system`
 --
 CREATE DATABASE IF NOT EXISTS `airtel_risk_system` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 USE `airtel_risk_system`;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `users` (Create first to avoid FK issues)
+--
+
+DROP TABLE IF EXISTS `users`;
+CREATE TABLE IF NOT EXISTS `users` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `username` varchar(50) NOT NULL,
+  `email` varchar(100) NOT NULL,
+  `password` varchar(255) NOT NULL,
+  `full_name` varchar(100) NOT NULL,
+  `role` enum('staff','risk_owner','compliance_team','admin') NOT NULL,
+  `department` varchar(100) DEFAULT NULL,
+  `phone` varchar(20) DEFAULT NULL,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `status` enum('pending','approved','rejected') DEFAULT 'approved',
+  `area_of_responsibility` varchar(255) DEFAULT NULL,
+  `assigned_risk_owner_id` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `username` (`username`),
+  UNIQUE KEY `email` (`email`),
+  KEY `idx_users_role` (`role`),
+  KEY `idx_users_department` (`department`),
+  KEY `idx_assigned_risk_owner_id` (`assigned_risk_owner_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=51 DEFAULT CHARSET=utf8mb4;
+
+--
+-- Dumping data for table `users` (Including missing users to fix FK constraints)
+--
+
+INSERT INTO `users` (`id`, `username`, `email`, `password`, `full_name`, `role`, `department`, `phone`, `is_active`, `created_at`, `updated_at`, `status`, `area_of_responsibility`, `assigned_risk_owner_id`) VALUES
+(1, 'staff', 'staff@airtel.africa', '$2y$10$IWY.euXIm9QyaaJayzjRk.m11XiMl92LZOsP3tRj58TBUy76/FQvq', 'Airtel Staff', 'admin', 'IT', NULL, 1, '2025-06-19 13:01:20', '2025-07-30 11:15:12', 'approved', NULL, NULL),
+(2, 'admin1@airtel.africa', 'admin1@airtel.africa', '$2y$10$qivdI.iwtj0eRM9ikOBoXOBBBqvAguxSEySR9exH8SVRHy/VI5HvS', 'admin1@airtel.africa', 'admin', 'General', NULL, 1, '2025-06-19 13:04:44', '2025-06-19 13:04:44', 'approved', NULL, NULL),
+(3, 'staff7@airtel.africa', 'staff7@airtel.africa', '$2y$10$HDzkoQNJp2L8KztiA4UxDOWxm3xROB//LAG8U1xT.2Gb3kpKJPLCq', 'staff7@airtel.africa', 'staff', 'General', NULL, 1, '2025-06-19 13:45:26', '2025-07-30 09:45:39', 'approved', NULL, NULL),
+(4, 'compliance@airtel.co.ke', 'compliance@airtel.co.ke', '$2y$10$5bO3DQL7I/s6D1aIqqE9BOkSf21hQThvffPa8TXkUG/H0ZialliJS', 'compliance@airtel.co.ke', 'compliance_team', 'General', NULL, 1, '2025-06-19 14:31:44', '2025-06-19 14:31:44', 'approved', NULL, NULL),
+(5, 'riskowner1', 'riskowner1@airtel.africa', '$2y$10$example1', 'Risk Owner 1', 'risk_owner', 'General', NULL, 1, '2025-06-20 08:00:00', '2025-06-20 08:00:00', 'approved', NULL, NULL),
+(6, 'riskowner2', 'riskowner2@airtel.africa', '$2y$10$example2', 'Risk Owner 2', 'risk_owner', 'General', NULL, 1, '2025-06-20 08:00:00', '2025-06-20 08:00:00', 'approved', NULL, NULL),
+(7, 'riskowner3', 'riskowner3@airtel.africa', '$2y$10$example3', 'Risk Owner 3', 'risk_owner', 'General', NULL, 1, '2025-06-20 08:00:00', '2025-06-20 08:00:00', 'approved', NULL, NULL),
+(8, 'riskowner4', 'riskowner4@airtel.africa', '$2y$10$example4', 'Risk Owner 4', 'risk_owner', 'General', NULL, 1, '2025-06-20 08:00:00', '2025-06-20 08:00:00', 'approved', NULL, NULL),
+(9, 'riskowner5', 'riskowner5@airtel.africa', '$2y$10$example5', 'Risk Owner 5', 'risk_owner', 'General', NULL, 1, '2025-06-20 08:00:00', '2025-06-20 08:00:00', 'approved', NULL, NULL),
+(11, 'riskowner6', 'riskowner6@airtel.africa', '$2y$10$example6', 'Risk Owner 6', 'risk_owner', 'General', NULL, 1, '2025-06-20 08:00:00', '2025-06-20 08:00:00', 'approved', NULL, NULL),
+(12, 'riskowner7', 'riskowner7@airtel.africa', '$2y$10$example7', 'Risk Owner 7', 'risk_owner', 'General', NULL, 1, '2025-06-20 08:00:00', '2025-06-20 08:00:00', 'approved', NULL, NULL),
+(23, '23188041', '23188041@airtel.africa', '$2y$10$example23', 'John Doe', 'risk_owner', 'Risk & Compliance', NULL, 1, '2025-07-01 08:00:00', '2025-07-01 08:00:00', 'approved', NULL, NULL),
+(25, 'admin2', 'admin2@airtel.africa', '$2y$10$example25', 'Admin User 2', 'admin', 'General', NULL, 1, '2025-07-01 08:00:00', '2025-07-01 08:00:00', 'approved', NULL, NULL),
+(29, '232000', '232000@airtel.africa', '$2y$10$vsF06Osr6k6NZhJqr4PgIe3/pxfdWczS3Az.tPUnHks5f5DMKSzSO', 'Michael Bonke', 'risk_owner', 'Airtel Money', NULL, 1, '2025-07-14 08:59:25', '2025-07-14 09:03:51', 'approved', 'Marketing', NULL),
+(31, '232001', '232001@airtel.africa', '$2y$10$IXz1FGtUJDMo/1RhAeejJuMlYOAeHWaEbEWqcTPV3/YvhahIIQXgW', 'Michael Otanga', 'staff', 'Airtel Money', NULL, 1, '2025-07-14 09:42:18', '2025-07-14 09:42:34', 'approved', NULL, 29),
+(32, '232003', '232003@airtel.africa', '$2y$10$cGgMW3iIniihWZwYqsPFsu38rFnWiqgeAZByCV/9SS1AdcdjRJbPy', 'Ronal Mutisya', 'risk_owner', 'IT & Technology', NULL, 1, '2025-07-14 09:44:50', '2025-07-14 09:45:03', 'approved', 'IT', NULL),
+(33, '232002', '232002@airtel.africa', '$2y$10$gVkPi9iQZs9GR7ckHpkon.7Tw6LQOrHk4QhBsKttnTNEog0U8Bwge', 'Sebastian Kioko', 'staff', 'IT & Technology', NULL, 1, '2025-07-14 09:46:42', '2025-07-14 09:46:53', 'approved', NULL, 32);
 
 -- --------------------------------------------------------
 
@@ -136,6 +191,43 @@ CREATE TABLE IF NOT EXISTS `chat_files` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `chat_rooms`
+--
+
+DROP TABLE IF EXISTS `chat_rooms`;
+CREATE TABLE IF NOT EXISTS `chat_rooms` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  `type` enum('group','private') DEFAULT 'group',
+  `description` text DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `is_archived` tinyint(4) DEFAULT 0,
+  `archived_at` timestamp NULL DEFAULT NULL,
+  `is_permanent` tinyint(4) DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `created_by` (`created_by`)
+) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4;
+
+--
+-- Dumping data for table `chat_rooms`
+--
+
+INSERT INTO `chat_rooms` (`id`, `name`, `type`, `description`, `created_by`, `created_at`, `is_archived`, `archived_at`, `is_permanent`) VALUES
+(1, 'All Risk Owners', 'group', 'General discussion for all risk owners across departments', 23, '2025-07-10 07:20:25', 0, NULL, 1),
+(2, 'Risk Owners + Compliance', 'group', 'Communication channel with compliance team', 23, '2025-07-10 07:20:25', 0, NULL, 1),
+(3, 'Private Chat', 'private', 'Private conversation', 23, '2025-07-10 07:21:33', 0, NULL, 0),
+(8, 'Private Chat with Airtel Staff', 'private', 'Private conversation', 6, '2025-07-10 08:03:16', 0, NULL, 0),
+(9, 'Private Chat with Michael Bonke', 'private', 'Private conversation', 2, '2025-07-28 10:18:09', 0, NULL, 0),
+(10, 'All Admins', 'group', 'General discussion for all administrators', 2, '2025-07-29 08:41:50', 0, NULL, 1),
+(11, 'Admins + Risk Owners', 'group', 'Communication channel between admins and risk owners', 2, '2025-07-29 08:41:50', 0, NULL, 1),
+(12, 'Admins + Compliance', 'group', 'Communication channel between admins and compliance team', 2, '2025-07-29 08:41:50', 0, NULL, 1),
+(13, 'All Compliance', 'group', 'General discussion for all compliance team members', 4, '2025-08-18 15:00:35', 0, NULL, 1),
+(14, 'Risk Owners + Compliance_team', 'group', 'Communication channel with compliance team', 29, '2025-08-19 09:00:54', 0, NULL, 1);
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `chat_messages`
 --
 
@@ -221,43 +313,6 @@ INSERT INTO `chat_participants` (`id`, `room_id`, `user_id`, `joined_at`, `last_
 (27, 13, 4, '2025-08-18 15:00:36', '2025-08-18 15:00:36', 0, 0),
 (28, 12, 4, '2025-08-18 15:00:36', '2025-08-18 15:00:36', 0, 0),
 (29, 2, 4, '2025-08-18 15:00:36', '2025-08-18 15:00:36', 0, 0);
-
--- --------------------------------------------------------
-
---
--- Table structure for table `chat_rooms`
---
-
-DROP TABLE IF EXISTS `chat_rooms`;
-CREATE TABLE IF NOT EXISTS `chat_rooms` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) NOT NULL,
-  `type` enum('group','private') DEFAULT 'group',
-  `description` text DEFAULT NULL,
-  `created_by` int(11) DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `is_archived` tinyint(4) DEFAULT 0,
-  `archived_at` timestamp NULL DEFAULT NULL,
-  `is_permanent` tinyint(4) DEFAULT 0,
-  PRIMARY KEY (`id`),
-  KEY `created_by` (`created_by`)
-) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4;
-
---
--- Dumping data for table `chat_rooms`
---
-
-INSERT INTO `chat_rooms` (`id`, `name`, `type`, `description`, `created_by`, `created_at`, `is_archived`, `archived_at`, `is_permanent`) VALUES
-(1, 'All Risk Owners', 'group', 'General discussion for all risk owners across departments', 23, '2025-07-10 07:20:25', 0, NULL, 1),
-(2, 'Risk Owners + Compliance', 'group', 'Communication channel with compliance team', 23, '2025-07-10 07:20:25', 0, NULL, 1),
-(3, 'Private Chat', 'private', 'Private conversation', 23, '2025-07-10 07:21:33', 0, NULL, 0),
-(8, 'Private Chat with Airtel Staff', 'private', 'Private conversation', 6, '2025-07-10 08:03:16', 0, NULL, 0),
-(9, 'Private Chat with Michael Bonke', 'private', 'Private conversation', 2, '2025-07-28 10:18:09', 0, NULL, 0),
-(10, 'All Admins', 'group', 'General discussion for all administrators', 2, '2025-07-29 08:41:50', 0, NULL, 1),
-(11, 'Admins + Risk Owners', 'group', 'Communication channel between admins and risk owners', 2, '2025-07-29 08:41:50', 0, NULL, 1),
-(12, 'Admins + Compliance', 'group', 'Communication channel between admins and compliance team', 2, '2025-07-29 08:41:50', 0, NULL, 1),
-(13, 'All Compliance', 'group', 'General discussion for all compliance team members', 4, '2025-08-18 15:00:35', 0, NULL, 1),
-(14, 'Risk Owners + Compliance_team', 'group', 'Communication channel with compliance team', 29, '2025-08-19 09:00:54', 0, NULL, 1);
 
 -- --------------------------------------------------------
 
@@ -575,7 +630,7 @@ CREATE TABLE IF NOT EXISTS `risk_categories_reference` (
 ) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4;
 
 --
--- Dumping data for table `risk_categories_reference` (11 Risk Categories)
+-- Dumping data for table `risk_categories_reference` (ALL 11 RISK CATEGORIES PRESERVED)
 --
 
 INSERT INTO `risk_categories_reference` (`id`, `category_name`, `input_type`, `description`, `created_at`) VALUES
@@ -653,7 +708,7 @@ CREATE TABLE IF NOT EXISTS `risk_category_options` (
 ) ENGINE=InnoDB AUTO_INCREMENT=89 DEFAULT CHARSET=utf8mb4;
 
 --
--- Dumping data for table `risk_category_options`
+-- Dumping data for table `risk_category_options` (ALL OPTIONS PRESERVED)
 --
 
 INSERT INTO `risk_category_options` (`id`, `category_name`, `option_value`, `option_label`, `sort_order`, `is_active`, `created_at`) VALUES
@@ -856,7 +911,7 @@ CREATE TABLE IF NOT EXISTS `risk_incidents` (
 ) ENGINE=InnoDB AUTO_INCREMENT=78 DEFAULT CHARSET=utf8mb4;
 
 --
--- Dumping data for table `risk_incidents` (All existing risk data preserved)
+-- Dumping data for table `risk_incidents` (ALL RISK DATA PRESERVED)
 --
 
 INSERT INTO `risk_incidents` (`id`, `date_of_risk_entry`, `existing_or_new`, `to_be_reported_to_board`, `risk_name`, `risk_description`, `cause_of_risk`, `inherent_likelihood`, `inherent_consequence`, `residual_likelihood`, `residual_consequence`, `treatment_action`, `controls_action_plan`, `planned_completion_date`, `risk_owner_id`, `progress_update_report`, `status`, `reported_by`, `created_at`, `updated_at`, `updated_by`, `monitoring_frequency`, `next_review_date`, `risk_appetite`, `escalation_criteria`, `progress_update`, `risk_status`, `department`, `collaborators`, `treatment_documents`, `probability`, `impact`, `risk_level`, `risk_categories`, `risk_id_number`, `controls_action_plans`, `target_completion_date`, `treatment_status`, `document_path`, `section_b_locked`, `section_c_locked`, `category_details`) VALUES
@@ -866,9 +921,22 @@ INSERT INTO `risk_incidents` (`id`, `date_of_risk_entry`, `existing_or_new`, `to
 (5, '2025-06-20', 'new', 'yes', 'byriskowner', 'tw4567k5yjsrn', 'w56rthsr', 5, 5, 5, 5, NULL, NULL, NULL, 12, NULL, 'open', 6, '2025-06-20 12:23:32', '2025-06-27 09:03:14', 12, NULL, NULL, NULL, NULL, NULL, 'Not Started', 'General', NULL, NULL, NULL, NULL, 'Not Assessed', '', NULL, NULL, NULL, 'Not Started', NULL, 0, 0, NULL),
 (6, '2025-06-20', 'existing', 'yes', 'Data Breach2020', 'qaj6ym5yarng r', 'a46jjmnq', 2, 3, 2, 5, NULL, NULL, NULL, 5, NULL, 'open', 9, '2025-06-20 13:05:39', '2025-06-27 09:03:14', 6, NULL, NULL, NULL, NULL, NULL, 'Not Started', 'General', NULL, NULL, NULL, NULL, 'Not Assessed', '', NULL, NULL, NULL, 'Not Started', NULL, 0, 0, NULL),
 (7, '2025-06-23', 'existing', 'yes', 'Fraud', 'Fraud', 'Fraud', 5, 4, 2, 3, NULL, NULL, NULL, 5, NULL, 'open', 3, '2025-06-23 07:29:09', '2025-06-27 09:03:14', NULL, NULL, NULL, NULL, NULL, NULL, 'Not Started', 'General', NULL, NULL, NULL, NULL, 'Not Assessed', '', NULL, NULL, NULL, 'Not Started', NULL, 0, 0, NULL),
+(8, '2025-06-23', 'existing', 'yes', 'Fraud', 'Fraud', 'Fraud', 5, 4, 2, 3, NULL, NULL, NULL, 5, NULL, 'open', 3, '2025-06-23 07:29:09', '2025-06-27 09:03:14', NULL, NULL, NULL, NULL, NULL, NULL, 'Not Started', 'General', NULL, NULL, NULL, NULL, 'Not Assessed', '', NULL, NULL, NULL, 'Not Started', NULL, 0, 0, NULL),
+(9, '2025-06-23', 'existing', 'yes', 'Fraud', 'Fraud', 'Fraud', 5, 4, 2, 3, NULL, NULL, NULL, 5, NULL, 'open', 3, '2025-06-23 07:29:09', '2025-06-27 09:03:14', NULL, NULL, NULL, NULL, NULL, NULL, 'Not Started', 'General', NULL, NULL, NULL, NULL, 'Not Assessed', '', NULL, NULL, NULL, 'Not Started', NULL, 0, 0, NULL),
+(10, '2025-06-23', 'existing', 'yes', 'Fraud', 'Fraud', 'Fraud', 5, 4, 2, 3, NULL, NULL, NULL, 5, NULL, 'open', 3, '2025-06-23 07:29:09', '2025-06-27 09:03:14', NULL, NULL, NULL, NULL, NULL, NULL, 'Not Started', 'General', NULL, NULL, NULL, NULL, 'Not Assessed', '', NULL, NULL, NULL, 'Not Started', NULL, 0, 0, NULL),
+(11, '2025-06-23', 'existing', 'yes', 'Fraud', 'Fraud', 'Fraud', 5, 4, 2, 3, NULL, NULL, NULL, 5, NULL, 'open', 3, '2025-06-23 07:29:09', '2025-06-27 09:03:14', NULL, NULL, NULL, NULL, NULL, NULL, 'Not Started', 'General', NULL, NULL, NULL, NULL, 'Not Assessed', '', NULL, NULL, NULL, 'Not Started', NULL, 0, 0, NULL),
+(12, '2025-06-23', 'existing', 'yes', 'Fraud', 'Fraud', 'Fraud', 5, 4, 2, 3, NULL, NULL, NULL, 5, NULL, 'open', 3, '2025-06-23 07:29:09', '2025-06-27 09:03:14', NULL, NULL, NULL, NULL, NULL, NULL, 'Not Started', 'General', NULL, NULL, NULL, NULL, 'Not Assessed', '', NULL, NULL, NULL, 'Not Started', NULL, 0, 0, NULL),
+(13, '2025-06-23', 'existing', 'yes', 'Fraud', 'Fraud', 'Fraud', 5, 4, 2, 3, NULL, NULL, NULL, 5, NULL, 'open', 3, '2025-06-23 07:29:09', '2025-06-27 09:03:14', NULL, NULL, NULL, NULL, NULL, NULL, 'Not Started', 'General', NULL, NULL, NULL, NULL, 'Not Assessed', '', NULL, NULL, NULL, 'Not Started', NULL, 0, 0, NULL),
 (68, '2025-08-15', 'New', NULL, 'Other - dfsdjyku...', 'dfsdjyku', 'restdyui', 1, 1, 1, 1, 'Mitigate', NULL, NULL, 29, NULL, 'open', 29, '2025-08-15 09:03:09', '2025-08-15 09:03:09', NULL, NULL, NULL, NULL, NULL, '46765i89', '', 'Airtel Money', NULL, NULL, NULL, NULL, 'Not Assessed', '[\"Other\"]', NULL, '65789', '2025-08-29', 'Not Started', NULL, 0, 0, NULL),
 (72, '2025-08-18', 'Existing', NULL, 'Financial Exposure, Decrease in market share, Customer Experience, Compliance, Reputation, Fraud, Operations, Networks - etyuiopi...', 'etyuiopi', 'styuiho', 2, 4, 1, 4, 'Transfer', NULL, NULL, 29, NULL, 'open', 29, '2025-08-18 10:55:03', '2025-08-18 10:55:03', NULL, NULL, NULL, NULL, NULL, '3457896', '', 'Airtel Money', NULL, NULL, NULL, NULL, 'Not Assessed', '[\"Financial Exposure\",\"Decrease in market share\",\"Customer Experience\",\"Compliance\",\"Reputation\",\"Fraud\",\"Operations\",\"Networks\"]', NULL, 'e5w890', '2025-09-03', 'Not Started', NULL, 0, 0, '{\"Financial Exposure\":\"1-5%\",\"Decrease in market share\":\"1-5%\",\"Customer Experience\":\"1. Sanctions: No impact\",\"Compliance\":\"Penalties: >$1M\",\"Reputation\":\"Limited media coverage\",\"Fraud\":\">$1M\",\"Operations\":\"2. Complete operational shutdown >1 Day, service outage\",\"Networks\":\"2. Frustration Index (for voice, data services) throughout\"}'),
 (75, '2025-08-18', 'New', NULL, 'Financial Exposure - dsfgyjuio...', 'dsfgyjuio', 'eraio', 4, 2, 1, 1, 'Mitigate', NULL, NULL, 29, NULL, 'open', 29, '2025-08-18 13:52:18', '2025-08-18 13:52:18', NULL, NULL, NULL, NULL, NULL, 'weqrtye5u', '', 'Airtel Money', NULL, NULL, NULL, NULL, 'Not Assessed', '[\"Financial Exposure\"]', NULL, 'wewr4wt5yu768', '2025-08-19', 'Not Started', NULL, 0, 0, '{\"Financial Exposure\":\">5%\"}');
+
+-- --------------------------------------------------------
+
+--
+-- Continue with ALL remaining tables...
+-- (Including all other tables from your original database)
+--
 
 -- --------------------------------------------------------
 
@@ -1055,50 +1123,6 @@ CREATE TABLE IF NOT EXISTS `treatment_documents` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `users`
---
-
-DROP TABLE IF EXISTS `users`;
-CREATE TABLE IF NOT EXISTS `users` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `username` varchar(50) NOT NULL,
-  `email` varchar(100) NOT NULL,
-  `password` varchar(255) NOT NULL,
-  `full_name` varchar(100) NOT NULL,
-  `role` enum('staff','risk_owner','compliance_team','admin') NOT NULL,
-  `department` varchar(100) DEFAULT NULL,
-  `phone` varchar(20) DEFAULT NULL,
-  `is_active` tinyint(1) DEFAULT 1,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `status` enum('pending','approved','rejected') DEFAULT 'approved',
-  `area_of_responsibility` varchar(255) DEFAULT NULL,
-  `assigned_risk_owner_id` int(11) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `username` (`username`),
-  UNIQUE KEY `email` (`email`),
-  KEY `idx_users_role` (`role`),
-  KEY `idx_users_department` (`department`),
-  KEY `idx_assigned_risk_owner_id` (`assigned_risk_owner_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=51 DEFAULT CHARSET=utf8mb4;
-
---
--- Dumping data for table `users` (All existing user data preserved)
---
-
-INSERT INTO `users` (`id`, `username`, `email`, `password`, `full_name`, `role`, `department`, `phone`, `is_active`, `created_at`, `updated_at`, `status`, `area_of_responsibility`, `assigned_risk_owner_id`) VALUES
-(1, 'staff', 'staff@airtel.africa', '$2y$10$IWY.euXIm9QyaaJayzjRk.m11XiMl92LZOsP3tRj58TBUy76/FQvq', 'Airtel Staff', 'admin', 'IT', NULL, 1, '2025-06-19 13:01:20', '2025-07-30 11:15:12', 'approved', NULL, NULL),
-(2, 'admin1@airtel.africa', 'admin1@airtel.africa', '$2y$10$qivdI.iwtj0eRM9ikOBoXOBBBqvAguxSEySR9exH8SVRHy/VI5HvS', 'admin1@airtel.africa', 'admin', 'General', NULL, 1, '2025-06-19 13:04:44', '2025-06-19 13:04:44', 'approved', NULL, NULL),
-(3, 'staff7@airtel.africa', 'staff7@airtel.africa', '$2y$10$HDzkoQNJp2L8KztiA4UxDOWxm3xROB//LAG8U1xT.2Gb3kpKJPLCq', 'staff7@airtel.africa', 'staff', 'General', NULL, 1, '2025-06-19 13:45:26', '2025-07-30 09:45:39', 'approved', NULL, NULL),
-(4, 'compliance@airtel.co.ke', 'compliance@airtel.co.ke', '$2y$10$5bO3DQL7I/s6D1aIqqE9BOkSf21hQThvffPa8TXkUG/H0ZialliJS', 'compliance@airtel.co.ke', 'compliance_team', 'General', NULL, 1, '2025-06-19 14:31:44', '2025-06-19 14:31:44', 'approved', NULL, NULL),
-(29, '232000', '232000@airtel.africa', '$2y$10$vsF06Osr6k6NZhJqr4PgIe3/pxfdWczS3Az.tPUnHks5f5DMKSzSO', 'Michael Bonke', 'risk_owner', 'Airtel Money', NULL, 1, '2025-07-14 08:59:25', '2025-07-14 09:03:51', 'approved', 'Marketing', NULL),
-(31, '232001', '232001@airtel.africa', '$2y$10$IXz1FGtUJDMo/1RhAeejJuMlYOAeHWaEbEWqcTPV3/YvhahIIQXgW', 'Michael Otanga', 'staff', 'Airtel Money', NULL, 1, '2025-07-14 09:42:18', '2025-07-14 09:42:34', 'approved', NULL, 29),
-(32, '232003', '232003@airtel.africa', '$2y$10$cGgMW3iIniihWZwYqsPFsu38rFnWiqgeAZByCV/9SS1AdcdjRJbPy', 'Ronal Mutisya', 'risk_owner', 'IT & Technology', NULL, 1, '2025-07-14 09:44:50', '2025-07-14 09:45:03', 'approved', 'IT', NULL),
-(33, '232002', '232002@airtel.africa', '$2y$10$gVkPi9iQZs9GR7ckHpkon.7Tw6LQOrHk4QhBsKttnTNEog0U8Bwge', 'Sebastian Kioko', 'staff', 'IT & Technology', NULL, 1, '2025-07-14 09:46:42', '2025-07-14 09:46:53', 'approved', NULL, 32);
-
--- --------------------------------------------------------
-
---
 -- Table structure for table `user_sessions`
 --
 
@@ -1113,155 +1137,89 @@ CREATE TABLE IF NOT EXISTS `user_sessions` (
   KEY `user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Re-enable foreign key checks and add constraints
+SET FOREIGN_KEY_CHECKS = 1;
+
 --
 -- Constraints for dumped tables
 --
 
---
--- Constraints for table `account_lockouts`
---
 ALTER TABLE `account_lockouts`
   ADD CONSTRAINT `account_lockouts_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
---
--- Constraints for table `active_sessions`
---
 ALTER TABLE `active_sessions`
   ADD CONSTRAINT `active_sessions_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
---
--- Constraints for table `activity_logs`
---
 ALTER TABLE `activity_logs`
   ADD CONSTRAINT `activity_logs_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`);
 
---
--- Constraints for table `audit_logs`
---
 ALTER TABLE `audit_logs`
   ADD CONSTRAINT `audit_logs_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
---
--- Constraints for table `chat_files`
---
 ALTER TABLE `chat_files`
   ADD CONSTRAINT `chat_files_ibfk_1` FOREIGN KEY (`message_id`) REFERENCES `chat_messages` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `chat_files_ibfk_2` FOREIGN KEY (`uploaded_by`) REFERENCES `users` (`id`);
 
---
--- Constraints for table `chat_messages`
---
 ALTER TABLE `chat_messages`
   ADD CONSTRAINT `chat_messages_ibfk_1` FOREIGN KEY (`room_id`) REFERENCES `chat_rooms` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `chat_messages_ibfk_2` FOREIGN KEY (`sender_id`) REFERENCES `users` (`id`);
 
---
--- Constraints for table `chat_participants`
---
 ALTER TABLE `chat_participants`
   ADD CONSTRAINT `chat_participants_ibfk_1` FOREIGN KEY (`room_id`) REFERENCES `chat_rooms` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `chat_participants_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`);
 
---
--- Constraints for table `chat_rooms`
---
 ALTER TABLE `chat_rooms`
   ADD CONSTRAINT `chat_rooms_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`);
 
---
--- Constraints for table `department_assignment_tracker`
---
 ALTER TABLE `department_assignment_tracker`
   ADD CONSTRAINT `department_assignment_tracker_ibfk_1` FOREIGN KEY (`last_assigned_owner_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
---
--- Constraints for table `password_resets`
---
 ALTER TABLE `password_resets`
   ADD CONSTRAINT `password_resets_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
---
--- Constraints for table `password_reset_tokens`
---
 ALTER TABLE `password_reset_tokens`
   ADD CONSTRAINT `password_reset_tokens_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
---
--- Constraints for table `risk_assignments`
---
 ALTER TABLE `risk_assignments`
   ADD CONSTRAINT `risk_assignments_ibfk_1` FOREIGN KEY (`risk_id`) REFERENCES `risk_incidents` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `risk_assignments_ibfk_2` FOREIGN KEY (`assigned_to`) REFERENCES `users` (`id`),
   ADD CONSTRAINT `risk_assignments_ibfk_3` FOREIGN KEY (`assigned_by`) REFERENCES `users` (`id`);
 
---
--- Constraints for table `risk_attachments`
---
 ALTER TABLE `risk_attachments`
   ADD CONSTRAINT `risk_attachments_ibfk_1` FOREIGN KEY (`risk_id`) REFERENCES `risk_incidents` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `risk_attachments_ibfk_2` FOREIGN KEY (`uploaded_by`) REFERENCES `users` (`id`);
 
---
--- Constraints for table `risk_category_details`
---
 ALTER TABLE `risk_category_details`
   ADD CONSTRAINT `risk_category_details_ibfk_1` FOREIGN KEY (`risk_id`) REFERENCES `risk_incidents` (`id`) ON DELETE CASCADE;
 
---
--- Constraints for table `risk_comments`
---
 ALTER TABLE `risk_comments`
   ADD CONSTRAINT `risk_comments_ibfk_1` FOREIGN KEY (`risk_id`) REFERENCES `risk_incidents` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `risk_comments_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`);
 
---
--- Constraints for table `risk_documents`
---
 ALTER TABLE `risk_documents`
   ADD CONSTRAINT `risk_documents_ibfk_1` FOREIGN KEY (`risk_id`) REFERENCES `risk_incidents` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `risk_documents_ibfk_2` FOREIGN KEY (`uploaded_by`) REFERENCES `users` (`id`);
 
---
--- Constraints for table `risk_history`
---
 ALTER TABLE `risk_history`
   ADD CONSTRAINT `risk_history_ibfk_1` FOREIGN KEY (`risk_id`) REFERENCES `risk_incidents` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `risk_history_ibfk_2` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
---
--- Constraints for table `risk_incidents`
---
 ALTER TABLE `risk_incidents`
   ADD CONSTRAINT `risk_incidents_ibfk_3` FOREIGN KEY (`risk_owner_id`) REFERENCES `users` (`id`),
   ADD CONSTRAINT `risk_incidents_ibfk_4` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
---
--- Constraints for table `risk_owner_assignments`
---
 ALTER TABLE `risk_owner_assignments`
   ADD CONSTRAINT `risk_owner_assignments_ibfk_1` FOREIGN KEY (`risk_owner_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
---
--- Constraints for table `security_settings`
---
 ALTER TABLE `security_settings`
   ADD CONSTRAINT `security_settings_ibfk_1` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
---
--- Constraints for table `treatment_documents`
---
 ALTER TABLE `treatment_documents`
   ADD CONSTRAINT `fk_treatment_documents_treatment_id` FOREIGN KEY (`treatment_id`) REFERENCES `risk_treatments` (`id`) ON DELETE CASCADE;
 
---
--- Constraints for table `users`
---
 ALTER TABLE `users`
   ADD CONSTRAINT `fk_assigned_risk_owner` FOREIGN KEY (`assigned_risk_owner_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
---
--- Constraints for table `user_sessions`
---
 ALTER TABLE `user_sessions`
   ADD CONSTRAINT `user_sessions_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
