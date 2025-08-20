@@ -1,3 +1,4 @@
+SET FOREIGN_KEY_CHECKS=0;
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 SET time_zone = "+00:00";
 
@@ -10,8 +11,8 @@ CREATE DATABASE IF NOT EXISTS `airtel_risk_system` DEFAULT CHARACTER SET utf8mb4
 USE `airtel_risk_system`;
 
 DROP TABLE IF EXISTS `account_lockouts`;
-CREATE TABLE `account_lockouts` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `account_lockouts` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
   `user_email` varchar(255) NOT NULL,
   `failed_attempts` int(11) DEFAULT 0,
@@ -22,12 +23,16 @@ CREATE TABLE `account_lockouts` (
   `locked_by_admin` tinyint(1) DEFAULT 0,
   `ip_address` varchar(45) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_user_email` (`user_email`),
+  KEY `idx_locked_at` (`locked_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `active_sessions`;
-CREATE TABLE `active_sessions` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `active_sessions` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
   `session_id` varchar(255) NOT NULL,
   `user_email` varchar(255) NOT NULL,
@@ -39,32 +44,41 @@ CREATE TABLE `active_sessions` (
   `last_activity` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `is_active` tinyint(1) DEFAULT 1,
   `logout_time` timestamp NULL DEFAULT NULL,
-  `session_data` text DEFAULT NULL
+  `session_data` text DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `session_id` (`session_id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_session_id` (`session_id`),
+  KEY `idx_last_activity` (`last_activity`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `activity_logs`;
-CREATE TABLE `activity_logs` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `activity_logs` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
   `action` varchar(100) NOT NULL,
   `description` text DEFAULT NULL,
   `ip_address` varchar(45) DEFAULT NULL,
   `user_agent` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=221 DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `audit_logs`;
-CREATE TABLE `audit_logs` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `audit_logs` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) DEFAULT NULL,
   `action` varchar(255) NOT NULL,
   `details` text DEFAULT NULL,
-  `timestamp` timestamp NOT NULL DEFAULT current_timestamp()
+  `timestamp` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `chat_files`;
-CREATE TABLE `chat_files` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `chat_files` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `message_id` int(11) DEFAULT NULL,
   `original_name` varchar(255) NOT NULL,
   `stored_name` varchar(255) NOT NULL,
@@ -72,12 +86,15 @@ CREATE TABLE `chat_files` (
   `file_size` int(11) NOT NULL,
   `file_type` varchar(100) NOT NULL,
   `uploaded_by` int(11) DEFAULT NULL,
-  `uploaded_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `uploaded_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `message_id` (`message_id`),
+  KEY `uploaded_by` (`uploaded_by`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `chat_messages`;
-CREATE TABLE `chat_messages` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `chat_messages` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `room_id` int(11) DEFAULT NULL,
   `sender_id` int(11) DEFAULT NULL,
   `message` text NOT NULL,
@@ -87,8 +104,12 @@ CREATE TABLE `chat_messages` (
   `file_name` varchar(255) DEFAULT NULL,
   `file_path` varchar(500) DEFAULT NULL,
   `file_size` int(11) DEFAULT NULL,
-  `file_type` varchar(100) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `file_type` varchar(100) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_chat_messages_room_id` (`room_id`),
+  KEY `idx_chat_messages_sender_id` (`sender_id`),
+  KEY `idx_chat_messages_created_at` (`created_at`)
+) ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO `chat_messages` (`id`, `room_id`, `sender_id`, `message`, `message_type`, `created_at`, `is_deleted`, `file_name`, `file_path`, `file_size`, `file_type`) VALUES
 (2, 3, 23, '[Message deleted]', 'text', '2025-07-10 07:22:04', 1, NULL, NULL, NULL, NULL),
@@ -107,15 +128,19 @@ INSERT INTO `chat_messages` (`id`, `room_id`, `sender_id`, `message`, `message_t
 (22, 12, 4, '[Message deleted]', 'text', '2025-08-19 20:30:48', 1, NULL, NULL, NULL, NULL);
 
 DROP TABLE IF EXISTS `chat_participants`;
-CREATE TABLE `chat_participants` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `chat_participants` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `room_id` int(11) DEFAULT NULL,
   `user_id` int(11) DEFAULT NULL,
   `joined_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `last_seen` timestamp NOT NULL DEFAULT current_timestamp(),
   `last_message_read` int(11) DEFAULT 0,
-  `is_archived` tinyint(4) DEFAULT 0
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `is_archived` tinyint(4) DEFAULT 0,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_participant` (`room_id`,`user_id`),
+  KEY `idx_chat_participants_room_user` (`room_id`,`user_id`),
+  KEY `idx_chat_participants_user_id` (`user_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO `chat_participants` (`id`, `room_id`, `user_id`, `joined_at`, `last_seen`, `last_message_read`, `is_archived`) VALUES
 (1, 1, 23, '2025-07-10 07:20:25', '2025-07-10 09:57:37', 0, 0),
@@ -143,8 +168,8 @@ INSERT INTO `chat_participants` (`id`, `room_id`, `user_id`, `joined_at`, `last_
 (31, 15, 2, '2025-08-19 20:29:46', '2025-08-19 20:29:46', 0, 0);
 
 DROP TABLE IF EXISTS `chat_rooms`;
-CREATE TABLE `chat_rooms` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `chat_rooms` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `name` varchar(255) NOT NULL,
   `type` enum('group','private') DEFAULT 'group',
   `description` text DEFAULT NULL,
@@ -152,8 +177,10 @@ CREATE TABLE `chat_rooms` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `is_archived` tinyint(4) DEFAULT 0,
   `archived_at` timestamp NULL DEFAULT NULL,
-  `is_permanent` tinyint(4) DEFAULT 0
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `is_permanent` tinyint(4) DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `created_by` (`created_by`)
+) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO `chat_rooms` (`id`, `name`, `type`, `description`, `created_by`, `created_at`, `is_archived`, `archived_at`, `is_permanent`) VALUES
 (1, 'All Risk Owners', 'group', 'General discussion for all risk owners across departments', 23, '2025-07-10 07:20:25', 0, NULL, 1),
@@ -169,8 +196,8 @@ INSERT INTO `chat_rooms` (`id`, `name`, `type`, `description`, `created_by`, `cr
 (15, 'Private Chat with admin1@airtel.africa', 'private', 'Private conversation', 4, '2025-08-19 20:29:46', 0, NULL, 0);
 
 DROP TABLE IF EXISTS `deleted_users`;
-CREATE TABLE `deleted_users` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `deleted_users` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `original_user_id` int(11) NOT NULL,
   `full_name` varchar(255) NOT NULL,
   `email` varchar(255) NOT NULL,
@@ -183,47 +210,57 @@ CREATE TABLE `deleted_users` (
   `original_created_at` datetime DEFAULT NULL,
   `original_updated_at` datetime DEFAULT NULL,
   `deleted_at` datetime DEFAULT current_timestamp(),
-  `deleted_by` int(11) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `deleted_by` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_original_user_id` (`original_user_id`),
+  KEY `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO `deleted_users` (`id`, `original_user_id`, `full_name`, `email`, `username`, `password`, `role`, `department`, `status`, `is_active`, `original_created_at`, `original_updated_at`, `deleted_at`, `deleted_by`) VALUES
 (3, 35, 'Joy Ogutu', '23188042@airtel.africa', '23188042', '$2y$10$iWMZZ2peleY5hHyfQN6qbuANsweNhsG.fJquLgrbZD8FCrosXrZim', 'staff', 'Risk & Compliance', 'approved', 1, '2025-07-15 14:57:24', '2025-07-30 12:00:46', '2025-07-30 12:48:15', 2);
 
 DROP TABLE IF EXISTS `department_assignment_queue`;
-CREATE TABLE `department_assignment_queue` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `department_assignment_queue` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `department` varchar(100) NOT NULL,
   `next_assignee_index` int(11) DEFAULT 0,
-  `last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `department_assignment_tracker`;
-CREATE TABLE `department_assignment_tracker` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `department_assignment_tracker` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `department` varchar(100) NOT NULL,
   `last_assigned_owner_id` int(11) DEFAULT NULL,
   `last_assignment_date` timestamp NOT NULL DEFAULT current_timestamp(),
   `total_assignments` int(11) DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `department` (`department`),
+  KEY `idx_department` (`department`),
+  KEY `idx_last_assigned` (`last_assigned_owner_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO `department_assignment_tracker` (`id`, `department`, `last_assigned_owner_id`, `last_assignment_date`, `total_assignments`, `created_at`, `updated_at`) VALUES
 (1, 'General', NULL, '2025-06-30 08:11:21', 0, '2025-06-30 08:11:21', '2025-06-30 08:11:21');
 
 DROP TABLE IF EXISTS `invite_tokens`;
-CREATE TABLE `invite_tokens` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `invite_tokens` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `email` varchar(255) NOT NULL,
   `token` varchar(255) NOT NULL,
   `role` varchar(50) NOT NULL,
   `expires_at` datetime NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `login_history`;
-CREATE TABLE `login_history` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `login_history` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) DEFAULT NULL,
   `email` varchar(255) NOT NULL,
   `ip_address` varchar(45) NOT NULL,
@@ -234,32 +271,46 @@ CREATE TABLE `login_history` (
 ) ;
 
 DROP TABLE IF EXISTS `notifications`;
-CREATE TABLE `notifications` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `notifications` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `risk_id` int(11) NOT NULL,
   `owner_id` int(11) NOT NULL,
   `message` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `risk_id` (`risk_id`),
+  KEY `owner_id` (`owner_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `password_resets`;
-CREATE TABLE `password_resets` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `password_resets` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
   `token` varchar(64) NOT NULL,
   `expires_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `used` tinyint(1) DEFAULT 0,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `token` (`token`),
+  UNIQUE KEY `unique_user_active` (`user_id`,`used`),
+  KEY `idx_token` (`token`),
+  KEY `idx_expires` (`expires_at`),
+  KEY `idx_user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `password_reset_tokens`;
-CREATE TABLE `password_reset_tokens` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `password_reset_tokens` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
   `token` varchar(64) NOT NULL,
   `expires_at` datetime NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `token` (`token`),
+  KEY `user_id` (`user_id`),
+  KEY `idx_token` (`token`),
+  KEY `idx_expires` (`expires_at`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO `password_reset_tokens` (`id`, `user_id`, `token`, `expires_at`, `created_at`) VALUES
 (1, 23, '36a5323d869c8dad1c00c4a70a023bf10ca07f4ec8debf87a62229ac299f737e', '2025-07-01 14:04:44', '2025-07-01 11:04:44'),
@@ -267,15 +318,19 @@ INSERT INTO `password_reset_tokens` (`id`, `user_id`, `token`, `expires_at`, `cr
 (3, 23, '246b5110cf1a5cf667a75053f99f93ed867a40d17982f2122501ce74a6fc4dd5', '2025-07-01 14:05:20', '2025-07-01 11:05:20');
 
 DROP TABLE IF EXISTS `risk_assignments`;
-CREATE TABLE `risk_assignments` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `risk_assignments` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `risk_id` int(11) NOT NULL,
   `assigned_to` int(11) NOT NULL,
   `assigned_by` int(11) NOT NULL,
   `assignment_date` timestamp NOT NULL DEFAULT current_timestamp(),
   `status` enum('Pending','Accepted','In Progress','Completed') DEFAULT 'Pending',
-  `notes` text DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `notes` text DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `risk_id` (`risk_id`),
+  KEY `assigned_to` (`assigned_to`),
+  KEY `assigned_by` (`assigned_by`)
+) ENGINE=InnoDB AUTO_INCREMENT=64 DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO `risk_assignments` (`id`, `risk_id`, `assigned_to`, `assigned_by`, `assignment_date`, `status`, `notes`) VALUES
 (1, 6, 5, 1, '2025-06-27 09:03:14', 'Pending', NULL),
@@ -343,25 +398,30 @@ INSERT INTO `risk_assignments` (`id`, `risk_id`, `assigned_to`, `assigned_by`, `
 (63, 65, 23, 25, '2025-07-14 07:52:17', 'Pending', NULL);
 
 DROP TABLE IF EXISTS `risk_attachments`;
-CREATE TABLE `risk_attachments` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `risk_attachments` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `risk_id` int(11) NOT NULL,
   `filename` varchar(255) NOT NULL,
   `original_name` varchar(255) NOT NULL,
   `file_size` int(11) DEFAULT NULL,
   `mime_type` varchar(100) DEFAULT NULL,
   `uploaded_by` int(11) NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `risk_id` (`risk_id`),
+  KEY `uploaded_by` (`uploaded_by`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `risk_categories_reference`;
-CREATE TABLE `risk_categories_reference` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `risk_categories_reference` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `category_name` varchar(100) NOT NULL,
   `input_type` enum('numeric','text') NOT NULL,
   `description` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `category_name` (`category_name`)
+) ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO `risk_categories_reference` (`id`, `category_name`, `input_type`, `description`, `created_at`) VALUES
 (1, 'Financial Exposure', 'text', 'Select impact level from dropdown options', '2025-08-13 14:26:58'),
@@ -377,15 +437,20 @@ INSERT INTO `risk_categories_reference` (`id`, `category_name`, `input_type`, `d
 (11, 'Other', 'text', 'Select impact level from dropdown options', '2025-08-13 14:26:58');
 
 DROP TABLE IF EXISTS `risk_category_details`;
-CREATE TABLE `risk_category_details` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `risk_category_details` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `risk_id` int(11) NOT NULL,
   `risk_category` varchar(100) NOT NULL,
   `category_value` decimal(15,2) DEFAULT NULL COMMENT 'For numeric categories',
   `category_description` text DEFAULT NULL COMMENT 'For dropdown selections and text-based categories',
   `category_type` enum('numeric','text') NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_risk_category_details` (`risk_id`,`risk_category`),
+  KEY `idx_risk_category` (`risk_id`,`risk_category`),
+  KEY `idx_risk_category_details_risk_id` (`risk_id`),
+  KEY `idx_risk_category_details_category` (`risk_category`)
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO `risk_category_details` (`id`, `risk_id`, `risk_category`, `category_value`, `category_description`, `category_type`, `created_at`) VALUES
 (1, 68, 'Other', '100.00', NULL, 'numeric', '2025-08-15 09:03:09'),
@@ -400,15 +465,21 @@ INSERT INTO `risk_category_details` (`id`, `risk_id`, `risk_category`, `category
 (10, 75, 'Financial Exposure', NULL, '>5%', 'text', '2025-08-18 13:52:18');
 
 DROP TABLE IF EXISTS `risk_category_options`;
-CREATE TABLE `risk_category_options` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `risk_category_options` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `category_name` varchar(100) NOT NULL,
   `option_value` varchar(255) NOT NULL,
   `option_label` varchar(255) NOT NULL,
   `sort_order` int(11) DEFAULT 0,
   `is_active` tinyint(1) DEFAULT 1,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_category_name` (`category_name`),
+  KEY `idx_active` (`is_active`),
+  KEY `idx_risk_category_options_category` (`category_name`),
+  KEY `idx_risk_category_options_active` (`is_active`),
+  KEY `idx_risk_category_options_sort` (`category_name`,`sort_order`)
+) ENGINE=InnoDB AUTO_INCREMENT=89 DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO `risk_category_options` (`id`, `category_name`, `option_value`, `option_label`, `sort_order`, `is_active`, `created_at`) VALUES
 (45, 'Financial Exposure', '>5%', 'Revenue/Operating Expenditure/Book value >5%', 1, 1, '2025-08-18 13:51:07'),
@@ -457,17 +528,20 @@ INSERT INTO `risk_category_options` (`id`, `category_name`, `option_value`, `opt
 (88, 'Other', 'Minimal Impact', 'Minimal Impact', 4, 1, '2025-08-18 13:51:08');
 
 DROP TABLE IF EXISTS `risk_comments`;
-CREATE TABLE `risk_comments` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `risk_comments` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `risk_id` int(11) NOT NULL,
   `user_id` int(11) NOT NULL,
   `comment` text NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `risk_id` (`risk_id`),
+  KEY `user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `risk_documents`;
-CREATE TABLE `risk_documents` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `risk_documents` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `risk_id` int(11) NOT NULL,
   `section_type` enum('controls_action_plans','progress_update') NOT NULL,
   `original_filename` varchar(255) NOT NULL,
@@ -475,8 +549,12 @@ CREATE TABLE `risk_documents` (
   `file_path` varchar(500) NOT NULL,
   `file_size` int(11) NOT NULL,
   `uploaded_by` int(11) NOT NULL,
-  `uploaded_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `uploaded_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_risk_id` (`risk_id`),
+  KEY `idx_section_type` (`section_type`),
+  KEY `uploaded_by` (`uploaded_by`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO `risk_documents` (`id`, `risk_id`, `section_type`, `original_filename`, `stored_filename`, `file_path`, `file_size`, `uploaded_by`, `uploaded_at`) VALUES
 (1, 37, 'controls_action_plans', 'Pyment Details.xlsx', '37_controls_action_plans_1751363405_0.xlsx', 'uploads/risk_documents/37_controls_action_plans_1751363405_0.xlsx', 13403, 23, '2025-07-01 09:50:05'),
@@ -484,16 +562,19 @@ INSERT INTO `risk_documents` (`id`, `risk_id`, `section_type`, `original_filenam
 (3, 37, 'progress_update', 'The Role of Social Media in The Shaping Of Adolescent Identity.docx', '37_progress_update_1751363405_0.docx', 'uploads/risk_documents/37_progress_update_1751363405_0.docx', 137778, 23, '2025-07-01 09:50:05');
 
 DROP TABLE IF EXISTS `risk_history`;
-CREATE TABLE `risk_history` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `risk_history` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `risk_id` int(11) NOT NULL,
   `change_type` varchar(100) NOT NULL,
   `change_description` text NOT NULL,
   `old_value` text DEFAULT NULL,
   `new_value` text DEFAULT NULL,
   `updated_by` int(11) NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_risk_id` (`risk_id`),
+  KEY `idx_updated_by` (`updated_by`)
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO `risk_history` (`id`, `risk_id`, `change_type`, `change_description`, `old_value`, `new_value`, `updated_by`, `created_at`) VALUES
 (1, 1, 'Risk Created', 'Risk \"Data Breach\" was initially reported', NULL, NULL, 2, '2025-06-19 13:39:49'),
@@ -506,8 +587,8 @@ INSERT INTO `risk_history` (`id`, `risk_id`, `change_type`, `change_description`
 (10, 5, 'Treatment Updated', 'Risk treatments and monitoring updated', NULL, NULL, 12, '2025-06-20 19:22:07');
 
 DROP TABLE IF EXISTS `risk_incidents`;
-CREATE TABLE `risk_incidents` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `risk_incidents` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `date_of_risk_entry` date NOT NULL DEFAULT curdate(),
   `existing_or_new` varchar(255) DEFAULT NULL,
   `to_be_reported_to_board` varchar(255) DEFAULT NULL,
@@ -550,8 +631,22 @@ CREATE TABLE `risk_incidents` (
   `document_path` varchar(255) DEFAULT NULL,
   `section_b_locked` tinyint(1) NOT NULL DEFAULT 0,
   `section_c_locked` tinyint(1) NOT NULL DEFAULT 0,
-  `category_details` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL COMMENT 'Category-specific dropdown selections as JSON object'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `category_details` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL COMMENT 'Category-specific dropdown selections as JSON object',
+  PRIMARY KEY (`id`),
+  KEY `reported_by` (`reported_by`),
+  KEY `idx_risk_owner` (`risk_owner_id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_inherent_rating` (`inherent_rating`),
+  KEY `idx_residual_rating` (`residual_rating`),
+  KEY `idx_updated_by` (`updated_by`),
+  KEY `idx_created_at` (`created_at`),
+  KEY `idx_treatment_status` (`treatment_status`),
+  KEY `idx_target_completion` (`target_completion_date`),
+  KEY `idx_risk_incidents_risk_owner_id` (`risk_owner_id`),
+  KEY `idx_risk_incidents_department` (`department`),
+  KEY `idx_risk_incidents_risk_status` (`risk_status`),
+  KEY `idx_risk_categories` (`risk_categories`(255))
+) ENGINE=InnoDB AUTO_INCREMENT=78 DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO `risk_incidents` (`id`, `date_of_risk_entry`, `existing_or_new`, `to_be_reported_to_board`, `risk_name`, `risk_description`, `cause_of_risk`, `inherent_likelihood`, `inherent_consequence`, `residual_likelihood`, `residual_consequence`, `treatment_action`, `controls_action_plan`, `planned_completion_date`, `risk_owner_id`, `progress_update_report`, `status`, `reported_by`, `created_at`, `updated_at`, `updated_by`, `monitoring_frequency`, `next_review_date`, `risk_appetite`, `escalation_criteria`, `progress_update`, `risk_status`, `department`, `collaborators`, `treatment_documents`, `probability`, `impact`, `risk_level`, `risk_categories`, `risk_id_number`, `controls_action_plans`, `target_completion_date`, `treatment_status`, `document_path`, `section_b_locked`, `section_c_locked`, `category_details`) VALUES
 (1, '2025-06-19', 'existing', 'no', 'Data Breach', 'There is data breach in airtelmoney', 'Weak security', 4, 1, 1, 5, 'mitigate', 'also mitigate', '2025-06-19', 1, 'continuous', 'in_progress', 2, '2025-06-19 13:39:49', '2025-06-27 09:03:14', NULL, NULL, NULL, NULL, NULL, NULL, 'Not Started', 'General', NULL, NULL, NULL, NULL, 'Not Assessed', '', NULL, NULL, NULL, 'Not Started', NULL, 0, 0, NULL),
@@ -612,8 +707,8 @@ INSERT INTO `risk_incidents` (`id`, `date_of_risk_entry`, `existing_or_new`, `to
 (77, '2025-08-19', NULL, NULL, '', '32yuo', 'ty8i', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 29, NULL, 'open', 31, '2025-08-19 11:10:05', '2025-08-19 11:10:05', NULL, NULL, NULL, NULL, NULL, NULL, 'Not Started', 'Airtel Money', NULL, NULL, NULL, NULL, 'Not Assessed', '[\"Financial Exposure\"]', NULL, NULL, NULL, 'Not Started', NULL, 0, 0, '[]');
 
 DROP TABLE IF EXISTS `risk_monitoring`;
-CREATE TABLE `risk_monitoring` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `risk_monitoring` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `risk_id` int(11) NOT NULL,
   `review_date` date NOT NULL,
   `review_notes` text NOT NULL,
@@ -622,23 +717,26 @@ CREATE TABLE `risk_monitoring` (
 ) ;
 
 DROP TABLE IF EXISTS `risk_owners`;
-CREATE TABLE `risk_owners` (
-  `id` int(11) NOT NULL,
-  `name` varchar(100) NOT NULL
+CREATE TABLE IF NOT EXISTS `risk_owners` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `risk_owner_assignments`;
-CREATE TABLE `risk_owner_assignments` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `risk_owner_assignments` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `department` varchar(100) NOT NULL,
   `risk_owner_id` int(11) NOT NULL,
   `assignment_count` int(11) DEFAULT 0,
-  `last_assigned` timestamp NOT NULL DEFAULT current_timestamp()
+  `last_assigned` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `risk_owner_id` (`risk_owner_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `risk_treatments`;
-CREATE TABLE `risk_treatments` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `risk_treatments` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `risk_id` int(11) NOT NULL,
   `treatment_title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `treatment_description` text COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -648,8 +746,12 @@ CREATE TABLE `risk_treatments` (
   `progress_notes` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `created_by` int(11) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `risk_id` (`risk_id`),
+  KEY `assigned_to` (`assigned_to`),
+  KEY `created_by` (`created_by`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `risk_treatments` (`id`, `risk_id`, `treatment_title`, `treatment_description`, `assigned_to`, `target_completion_date`, `status`, `progress_notes`, `created_by`, `created_at`, `updated_at`) VALUES
 (1, 52, 'vfdcx', 'dfxc ', 23, '2025-07-09', 'pending', NULL, 23, '2025-07-08 13:17:48', '2025-07-08 13:17:48'),
@@ -659,14 +761,17 @@ INSERT INTO `risk_treatments` (`id`, `risk_id`, `treatment_title`, `treatment_de
 (5, 67, 'This is just for testing', 'For assigning risk owner', 32, '2025-07-15', 'pending', NULL, 29, '2025-07-14 09:50:06', '2025-07-14 09:50:06');
 
 DROP TABLE IF EXISTS `security_settings`;
-CREATE TABLE `security_settings` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `security_settings` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `setting_name` varchar(100) NOT NULL,
   `setting_value` varchar(255) NOT NULL,
   `description` text DEFAULT NULL,
   `updated_by` int(11) DEFAULT NULL,
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `setting_name` (`setting_name`),
+  KEY `updated_by` (`updated_by`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO `security_settings` (`id`, `setting_name`, `setting_value`, `description`, `updated_by`, `updated_at`) VALUES
 (1, 'max_failed_attempts', '5', 'Maximum failed login attempts before account lockout', 2, '2025-08-11 09:03:43'),
@@ -676,8 +781,8 @@ INSERT INTO `security_settings` (`id`, `setting_name`, `setting_value`, `descrip
 (5, 'max_concurrent_sessions', '3', 'Maximum concurrent sessions per user', 2, '2025-08-11 09:00:26');
 
 DROP TABLE IF EXISTS `suspicious_activities`;
-CREATE TABLE `suspicious_activities` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `suspicious_activities` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) DEFAULT NULL,
   `activity_type` varchar(100) NOT NULL,
   `description` text NOT NULL,
@@ -688,8 +793,8 @@ CREATE TABLE `suspicious_activities` (
 ) ;
 
 DROP TABLE IF EXISTS `system_audit_logs`;
-CREATE TABLE `system_audit_logs` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `system_audit_logs` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `timestamp` datetime NOT NULL DEFAULT current_timestamp(),
   `user` varchar(255) NOT NULL,
   `action` varchar(255) NOT NULL,
@@ -698,8 +803,12 @@ CREATE TABLE `system_audit_logs` (
   `user_id` int(11) DEFAULT NULL,
   `resolved` tinyint(1) DEFAULT 0,
   `resolved_at` timestamp NULL DEFAULT NULL,
-  `resolved_by` int(11) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `resolved_by` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `timestamp` (`timestamp`),
+  KEY `user` (`user`),
+  KEY `action` (`action`)
+) ENGINE=InnoDB AUTO_INCREMENT=374 DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO `system_audit_logs` (`id`, `timestamp`, `user`, `action`, `details`, `ip_address`, `user_id`, `resolved`, `resolved_at`, `resolved_by`) VALUES
 (1, '2025-07-17 10:30:00', 'Admin User', 'Approved user John Doe', 'User ID: 101', '192.168.1.5', 1, 0, NULL, NULL),
@@ -1078,19 +1187,21 @@ INSERT INTO `system_audit_logs` (`id`, `timestamp`, `user`, `action`, `details`,
 (373, '2025-08-19 17:56:57', 'compliance@airtel.co.ke (Compliance Team)', 'Successful Login', 'User compliance@airtel.co.ke logged in successfully.', '::1', 4, 0, NULL, NULL);
 
 DROP TABLE IF EXISTS `treatment_documents`;
-CREATE TABLE `treatment_documents` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `treatment_documents` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `treatment_id` int(11) NOT NULL,
   `original_filename` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `file_path` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
   `file_size` int(11) NOT NULL,
   `file_type` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `uploaded_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `uploaded_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `treatment_id` (`treatment_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DROP TABLE IF EXISTS `users`;
-CREATE TABLE `users` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `users` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `username` varchar(50) NOT NULL,
   `email` varchar(100) NOT NULL,
   `password` varchar(255) NOT NULL,
@@ -1103,8 +1214,14 @@ CREATE TABLE `users` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `status` enum('pending','approved','rejected') DEFAULT 'approved',
   `area_of_responsibility` varchar(255) DEFAULT NULL,
-  `assigned_risk_owner_id` int(11) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `assigned_risk_owner_id` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `username` (`username`),
+  UNIQUE KEY `email` (`email`),
+  KEY `idx_users_role` (`role`),
+  KEY `idx_users_department` (`department`),
+  KEY `idx_assigned_risk_owner_id` (`assigned_risk_owner_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=51 DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO `users` (`id`, `username`, `email`, `password`, `full_name`, `role`, `department`, `phone`, `is_active`, `created_at`, `updated_at`, `status`, `area_of_responsibility`, `assigned_risk_owner_id`) VALUES
 (1, 'staff', 'staff@airtel.africa', '$2y$10$IWY.euXIm9QyaaJayzjRk.m11XiMl92LZOsP3tRj58TBUy76/FQvq', 'Airtel Staff', 'admin', 'IT', NULL, 1, '2025-06-19 13:01:20', '2025-07-30 11:15:12', 'approved', NULL, NULL),
@@ -1138,302 +1255,15 @@ INSERT INTO `users` (`id`, `username`, `email`, `password`, `full_name`, `role`,
 (50, 'ysterday', 'ysterday@ke.airtel.com', '$2y$10$ESsIaISjYfB2FLte6Qxxi.rnrAfhKJbxgDI4ApnDkV9DHeMGpQx/C', 'UserYesterday', 'risk_owner', 'Human Resources', NULL, 1, '2025-07-30 10:52:58', '2025-07-30 10:57:39', 'approved', 'Partnerships', NULL);
 
 DROP TABLE IF EXISTS `user_sessions`;
-CREATE TABLE `user_sessions` (
-  `id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `user_sessions` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
   `ip_address` varchar(45) NOT NULL,
   `device` text DEFAULT NULL,
-  `last_activity` timestamp NOT NULL DEFAULT current_timestamp()
+  `last_activity` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-
-ALTER TABLE `account_lockouts`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_user_id` (`user_id`),
-  ADD KEY `idx_user_email` (`user_email`),
-  ADD KEY `idx_locked_at` (`locked_at`);
-
-ALTER TABLE `active_sessions`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `session_id` (`session_id`),
-  ADD KEY `idx_user_id` (`user_id`),
-  ADD KEY `idx_session_id` (`session_id`),
-  ADD KEY `idx_last_activity` (`last_activity`);
-
-ALTER TABLE `activity_logs`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `user_id` (`user_id`);
-
-ALTER TABLE `audit_logs`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `user_id` (`user_id`);
-
-ALTER TABLE `chat_files`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `message_id` (`message_id`),
-  ADD KEY `uploaded_by` (`uploaded_by`);
-
-ALTER TABLE `chat_messages`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_chat_messages_room_id` (`room_id`),
-  ADD KEY `idx_chat_messages_sender_id` (`sender_id`),
-  ADD KEY `idx_chat_messages_created_at` (`created_at`);
-
-ALTER TABLE `chat_participants`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `unique_participant` (`room_id`,`user_id`),
-  ADD KEY `idx_chat_participants_room_user` (`room_id`,`user_id`),
-  ADD KEY `idx_chat_participants_user_id` (`user_id`);
-
-ALTER TABLE `chat_rooms`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `created_by` (`created_by`);
-
-ALTER TABLE `deleted_users`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_original_user_id` (`original_user_id`),
-  ADD KEY `idx_deleted_at` (`deleted_at`);
-
-ALTER TABLE `department_assignment_queue`
-  ADD PRIMARY KEY (`id`);
-
-ALTER TABLE `department_assignment_tracker`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `department` (`department`),
-  ADD KEY `idx_department` (`department`),
-  ADD KEY `idx_last_assigned` (`last_assigned_owner_id`);
-
-ALTER TABLE `invite_tokens`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `email` (`email`);
-
-ALTER TABLE `notifications`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `risk_id` (`risk_id`),
-  ADD KEY `owner_id` (`owner_id`);
-
-ALTER TABLE `password_resets`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `token` (`token`),
-  ADD UNIQUE KEY `unique_user_active` (`user_id`,`used`),
-  ADD KEY `idx_token` (`token`),
-  ADD KEY `idx_expires` (`expires_at`),
-  ADD KEY `idx_user_id` (`user_id`);
-
-ALTER TABLE `password_reset_tokens`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `token` (`token`),
-  ADD KEY `user_id` (`user_id`),
-  ADD KEY `idx_token` (`token`),
-  ADD KEY `idx_expires` (`expires_at`);
-
-ALTER TABLE `risk_assignments`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `risk_id` (`risk_id`),
-  ADD KEY `assigned_to` (`assigned_to`),
-  ADD KEY `assigned_by` (`assigned_by`);
-
-ALTER TABLE `risk_attachments`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `risk_id` (`risk_id`),
-  ADD KEY `uploaded_by` (`uploaded_by`);
-
-ALTER TABLE `risk_categories_reference`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `category_name` (`category_name`);
-
-ALTER TABLE `risk_category_details`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_risk_category_details` (`risk_id`,`risk_category`),
-  ADD KEY `idx_risk_category` (`risk_id`,`risk_category`),
-  ADD KEY `idx_risk_category_details_risk_id` (`risk_id`),
-  ADD KEY `idx_risk_category_details_category` (`risk_category`);
-
-ALTER TABLE `risk_category_options`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_category_name` (`category_name`),
-  ADD KEY `idx_active` (`is_active`),
-  ADD KEY `idx_risk_category_options_category` (`category_name`),
-  ADD KEY `idx_risk_category_options_active` (`is_active`),
-  ADD KEY `idx_risk_category_options_sort` (`category_name`,`sort_order`);
-
-ALTER TABLE `risk_comments`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `risk_id` (`risk_id`),
-  ADD KEY `user_id` (`user_id`);
-
-ALTER TABLE `risk_documents`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_risk_id` (`risk_id`),
-  ADD KEY `idx_section_type` (`section_type`),
-  ADD KEY `uploaded_by` (`uploaded_by`);
-
-ALTER TABLE `risk_history`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_risk_id` (`risk_id`),
-  ADD KEY `idx_updated_by` (`updated_by`);
-
-ALTER TABLE `risk_incidents`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `reported_by` (`reported_by`),
-  ADD KEY `idx_risk_owner` (`risk_owner_id`),
-  ADD KEY `idx_status` (`status`),
-  ADD KEY `idx_inherent_rating` (`inherent_rating`),
-  ADD KEY `idx_residual_rating` (`residual_rating`),
-  ADD KEY `idx_updated_by` (`updated_by`),
-  ADD KEY `idx_created_at` (`created_at`),
-  ADD KEY `idx_treatment_status` (`treatment_status`),
-  ADD KEY `idx_target_completion` (`target_completion_date`),
-  ADD KEY `idx_risk_incidents_risk_owner_id` (`risk_owner_id`),
-  ADD KEY `idx_risk_incidents_department` (`department`),
-  ADD KEY `idx_risk_incidents_risk_status` (`risk_status`),
-  ADD KEY `idx_risk_categories` (`risk_categories`(255));
-
-ALTER TABLE `risk_owners`
-  ADD PRIMARY KEY (`id`);
-
-ALTER TABLE `risk_owner_assignments`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `risk_owner_id` (`risk_owner_id`);
-
-ALTER TABLE `risk_treatments`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `risk_id` (`risk_id`),
-  ADD KEY `assigned_to` (`assigned_to`),
-  ADD KEY `created_by` (`created_by`);
-
-ALTER TABLE `security_settings`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `setting_name` (`setting_name`),
-  ADD KEY `updated_by` (`updated_by`);
-
-ALTER TABLE `system_audit_logs`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `timestamp` (`timestamp`),
-  ADD KEY `user` (`user`),
-  ADD KEY `action` (`action`);
-
-ALTER TABLE `treatment_documents`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `treatment_id` (`treatment_id`);
-
-ALTER TABLE `users`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `username` (`username`),
-  ADD UNIQUE KEY `email` (`email`),
-  ADD KEY `idx_users_role` (`role`),
-  ADD KEY `idx_users_department` (`department`),
-  ADD KEY `idx_assigned_risk_owner_id` (`assigned_risk_owner_id`);
-
-ALTER TABLE `user_sessions`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `user_id` (`user_id`);
-
-
-ALTER TABLE `account_lockouts`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `active_sessions`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `activity_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `audit_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `chat_files`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `chat_messages`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `chat_participants`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `chat_rooms`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `deleted_users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `department_assignment_queue`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `department_assignment_tracker`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `invite_tokens`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `login_history`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `notifications`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `password_resets`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `password_reset_tokens`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `risk_assignments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `risk_attachments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `risk_categories_reference`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `risk_category_details`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `risk_category_options`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `risk_comments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `risk_documents`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `risk_history`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `risk_incidents`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `risk_monitoring`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `risk_owners`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `risk_owner_assignments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `risk_treatments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `security_settings`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `suspicious_activities`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `system_audit_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `treatment_documents`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-ALTER TABLE `user_sessions`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 
 ALTER TABLE `account_lockouts`
@@ -1518,6 +1348,7 @@ ALTER TABLE `users`
 
 ALTER TABLE `user_sessions`
   ADD CONSTRAINT `user_sessions_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+SET FOREIGN_KEY_CHECKS=1;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
