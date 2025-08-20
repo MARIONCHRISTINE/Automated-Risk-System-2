@@ -121,3 +121,8 @@ For managing the My SQL database
 For source code versioning and collaboration
 
 
+
+
+MySQL said: Documentation
+
+#1452 - Cannot add or update a child row: a foreign key constraint fails (`airtel_risk_system`.`#sql-41a4_6d`, CONSTRAINT `chat_messages_ibfk_2` FOREIGN KEY (`sender_id`) REFERENCES `users` (`id`))
