@@ -1,11 +1,4 @@
--- phpMyAdmin SQL Dump
--- version 4.9.1
--- https://www.phpmyadmin.net/
---
--- Host: 127.0.0.1
--- Generation Time: Jul 14, 2025 at 02:26 PM
--- Server version: 10.4.8-MariaDB
--- PHP Version: 7.3.11
+
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 SET AUTOCOMMIT = 0;
@@ -22,39 +15,15 @@ SET time_zone = "+00:00";
 -- Database: `airtel_risk_system`
 --
 
--- --------------------------------------------------------
-
---
--- Table structure for table `users`
---
-
-CREATE TABLE `users` (
-  `id` int(11) NOT NULL,
-  `username` varchar(50) NOT NULL,
-  `email` varchar(100) NOT NULL,
-  `password` varchar(255) NOT NULL,
-  `full_name` varchar(100) NOT NULL,
-  `role` enum('staff','risk_owner','compliance_team','admin') NOT NULL,
-  `department` varchar(100) DEFAULT NULL,
-  `phone` varchar(20) DEFAULT NULL,
-  `is_active` tinyint(1) DEFAULT 1,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `status` enum('pending','approved','rejected') DEFAULT 'approved',
-  `area_of_responsibility` varchar(255) DEFAULT NULL,
-  `assigned_risk_owner_id` int(11) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 --
 -- Dumping data for table `users`
 --
 
 INSERT INTO `users` (`id`, `username`, `email`, `password`, `full_name`, `role`, `department`, `phone`, `is_active`, `created_at`, `updated_at`, `status`, `area_of_responsibility`, `assigned_risk_owner_id`) VALUES
-(1, 'staff', 'staff@airtel.africa', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Airtel Staff', 'admin', 'IT', NULL, 1, '2025-06-19 13:01:20', '2025-06-19 13:01:20', 'approved', NULL, NULL),
+(1, 'staff', 'staff@airtel.africa', '$2y$10$IWY.euXIm9QyaaJayzjRk.m11XiMl92LZOsP3tRj58TBUy76/FQvq', 'Airtel Staff', 'admin', 'IT', NULL, 1, '2025-06-19 13:01:20', '2025-07-30 11:15:12', 'approved', NULL, NULL),
 (2, 'admin1@airtel.africa', 'admin1@airtel.africa', '$2y$10$qivdI.iwtj0eRM9ikOBoXOBBBqvAguxSEySR9exH8SVRHy/VI5HvS', 'admin1@airtel.africa', 'admin', 'General', NULL, 1, '2025-06-19 13:04:44', '2025-06-19 13:04:44', 'approved', NULL, NULL),
-(3, 'staff7@airtel.africa', 'staff7@airtel.africa', '$2y$10$HDzkoQNJp2L8KztiA4UxDOWxm3xROB//LAG8U1xT.2Gb3kpKJPLCq', 'staff7@airtel.africa', 'staff', 'General', NULL, 1, '2025-06-19 13:45:26', '2025-06-30 13:04:27', '', NULL, NULL),
 (4, 'compliance@airtel.co.ke', 'compliance@airtel.co.ke', '$2y$10$5bO3DQL7I/s6D1aIqqE9BOkSf21hQThvffPa8TXkUG/H0ZialliJS', 'compliance@airtel.co.ke', 'compliance_team', 'General', NULL, 1, '2025-06-19 14:31:44', '2025-06-19 14:31:44', 'approved', NULL, NULL),
-(5, 'riskowner2@airtel.africa', 'riskowner2@airtel.africa', '$2y$10$5m/UW71k52b764krikRkuehDFqbFDSN/nio7lgMaxzXQG/wjTSQ0y', 'riskowner2@airtel.africa', 'risk_owner', 'General', NULL, 1, '2025-06-20 08:31:36', '2025-06-20 08:31:36', 'approved', NULL, NULL),
+(5, 'riskowner2@airtel.africa', 'riskowner2@airtel.africa', '$2y$10$5m/UW71k52b764krikRkuehDFqbFDSN/nio7lgMaxzXQG/wjTSQ0y', 'riskowner2@airtel.africa', 'risk_owner', 'General', NULL, 0, '2025-06-20 08:31:36', '2025-07-30 09:46:15', '', NULL, NULL),
 (6, 'riskowner9@airtel.africa', 'riskowner9@airtel.africa', '$2y$10$Sg0AKDPJZuqgQW0tNMezDO.4ymA.bFkIGEXc006chyNhRoxL.0X6u', 'riskowner9@airtel.africa', 'risk_owner', 'General', NULL, 1, '2025-06-20 09:05:19', '2025-06-20 09:05:19', 'approved', NULL, NULL),
 (7, 'riskowner10@airtel.africa', 'riskowner10@airtel.africa', '$2y$10$dUMjMqEPcHhdmiM6rY6PpOo.umSFLz1rIZ.O2CYiWTfmYLNIR8maK', 'riskowner10@airtel.africa', 'risk_owner', 'General', NULL, 1, '2025-06-20 09:24:00', '2025-06-20 09:24:00', 'approved', NULL, NULL),
 (8, 'riskowner100@airtel.africa', 'riskowner100@airtel.africa', '$2y$10$ci9ksQJBR8deSA6Oy93nY.m.D67QIFbFViJNquJFWYR2DodenCob2', 'riskowner100@airtel.africa', 'risk_owner', 'General', NULL, 1, '2025-06-20 12:55:38', '2025-06-20 12:55:38', 'approved', NULL, NULL),
@@ -62,51 +31,22 @@ INSERT INTO `users` (`id`, `username`, `email`, `password`, `full_name`, `role`,
 (10, 'riskowner102@airtel.africa', 'riskowner102@airtel.africa', '$2y$10$qh7vjdhg45YrNHLp8QlQ6uhut8ZZIhHPqc6usCjyjFyXZtntu0QVu', 'riskowner102@airtel.africa', 'staff', 'General', NULL, 1, '2025-06-20 13:55:00', '2025-06-20 13:55:00', 'approved', NULL, NULL),
 (11, 'riskowner106@airtel.africa', 'riskowner106@airtel.africa', '$2y$10$TLIm2I3v7RMrblpfp.uiUOpNqkUbKaadYE/SMNElnMMzQxvpnJhf.', 'riskowner106@airtel.africa', 'risk_owner', 'General', NULL, 1, '2025-06-20 13:56:23', '2025-06-20 13:56:23', 'approved', NULL, NULL),
 (12, 'riskowner000@airtel.africa', 'riskowner000@airtel.africa', '$2y$10$rWUxbgTVhIuwH5LzAyuXLu/nwJXSIg1/CQyVkAItFZ42c/AoBw1O2', 'riskowner000@airtel.africa', 'risk_owner', 'General', NULL, 1, '2025-06-20 15:47:28', '2025-06-20 15:47:28', 'approved', NULL, NULL),
-(13, 'staff777@airtel.africa', 'staff777@airtel.africa', '$2y$10$03oZ38jIR8gSN7dGEYX8ZOrl/4tl53xQWOcUq4TQs.KBdMuUK7o1C', 'staff777@airtel.africa', 'staff', 'General', NULL, 1, '2025-06-24 11:59:36', '2025-06-24 11:59:36', 'approved', NULL, NULL),
 (22, 'staff45', 'staff45@airtel.africa', '$2y$10$4NhR2DabOaJX7b1nAfz2BOgAvxz8WyhRZnG2LzE.D6a9gvhyZicCy', 'staff45@airtel.africa', 'staff', 'Customer Service', NULL, 1, '2025-07-01 07:05:19', '2025-07-01 07:05:54', 'approved', NULL, NULL),
 (23, 'riskowner45', 'riskowner45@airtel.africa', '$2y$10$TfdE8mnuRwHpDqoM0cBJOe8M.zSjLgVEy985NQ4IMI9uaoIsTHhUq', 'riskowner45@airtel.africa', 'risk_owner', 'Customer Service', NULL, 1, '2025-07-01 07:06:32', '2025-07-01 07:06:37', 'approved', NULL, NULL),
 (24, 'staff44', 'staff44@airtel.africa', '$2y$10$7N9yGMQ/9wKMzllcApKHn.qwIO4hG/OP6.kal2t/l.sSlWkIWtzMO', 'staff44@airtel.africa', 'staff', 'Customer Service', NULL, 1, '2025-07-01 07:10:18', '2025-07-01 07:10:30', 'approved', NULL, NULL),
-(25, 'staff43', 'staff43@airtel.africa', '$2y$10$FGlmqoqbqUJnUbS1lM4FHuEsfMgJN2xhpIHgDDhobfJKf982mGuem', 'staff43@airtel.africa', 'staff', 'Customer Service', NULL, 1, '2025-07-01 07:29:19', '2025-07-01 07:29:28', 'approved', NULL, NULL),
+(25, 'staff43', 'staff43@airtel.africa', '$2y$10$fLyUS9zNmpY2Cz6xsjmh8.8WeHLpiWlm4f7b8kw.dDrmGfw5CgNE2', 'staff43@airtel.africa', 'staff', 'Customer Service', NULL, 1, '2025-07-01 07:29:19', '2025-08-01 11:30:59', 'approved', NULL, NULL),
 (26, 'staff32', 'staff32@airtel.africa', '$2y$10$VT9K18eOXDW4tr3MfzqrX.RzRGlo5dkJiusGjYSXJozqFXPB1i5NK', 'Marion Christine', 'staff', 'IT & Technology', NULL, 1, '2025-07-10 09:16:14', '2025-07-10 09:16:49', 'approved', NULL, NULL),
 (29, '232000', '232000@airtel.africa', '$2y$10$vsF06Osr6k6NZhJqr4PgIe3/pxfdWczS3Az.tPUnHks5f5DMKSzSO', 'Michael Bonke', 'risk_owner', 'Airtel Money', NULL, 1, '2025-07-14 08:59:25', '2025-07-14 09:03:51', 'approved', 'Marketing', NULL),
 (31, '232001', '232001@airtel.africa', '$2y$10$IXz1FGtUJDMo/1RhAeejJuMlYOAeHWaEbEWqcTPV3/YvhahIIQXgW', 'Michael Otanga', 'staff', 'Airtel Money', NULL, 1, '2025-07-14 09:42:18', '2025-07-14 09:42:34', 'approved', NULL, 29),
 (32, '232003', '232003@airtel.africa', '$2y$10$cGgMW3iIniihWZwYqsPFsu38rFnWiqgeAZByCV/9SS1AdcdjRJbPy', 'Ronal Mutisya', 'risk_owner', 'IT & Technology', NULL, 1, '2025-07-14 09:44:50', '2025-07-14 09:45:03', 'approved', 'IT', NULL),
-(33, '232002', '232002@airtel.africa', '$2y$10$gVkPi9iQZs9GR7ckHpkon.7Tw6LQOrHk4QhBsKttnTNEog0U8Bwge', 'Sebastian Kioko', 'staff', 'IT & Technology', NULL, 1, '2025-07-14 09:46:42', '2025-07-14 09:46:53', 'approved', NULL, 32);
-
---
--- Indexes for dumped tables
---
-
---
--- Indexes for table `users`
---
-ALTER TABLE `users`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `username` (`username`),
-  ADD UNIQUE KEY `email` (`email`),
-  ADD KEY `idx_users_role` (`role`),
-  ADD KEY `idx_users_department` (`department`),
-  ADD KEY `idx_assigned_risk_owner_id` (`assigned_risk_owner_id`);
-
---
--- AUTO_INCREMENT for dumped tables
---
-
---
--- AUTO_INCREMENT for table `users`
---
-ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=34;
-
---
--- Constraints for dumped tables
---
-
---
--- Constraints for table `users`
---
-ALTER TABLE `users`
-  ADD CONSTRAINT `fk_assigned_risk_owner` FOREIGN KEY (`assigned_risk_owner_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+(33, '232002', '232002@airtel.africa', '$2y$10$gVkPi9iQZs9GR7ckHpkon.7Tw6LQOrHk4QhBsKttnTNEog0U8Bwge', 'Sebastian Kioko', 'staff', 'IT & Technology', NULL, 1, '2025-07-14 09:46:42', '2025-07-14 09:46:53', 'approved', NULL, 32),
+(34, '232004', '232004@airtel.africa', '$2y$10$gPwYWYGvOWnelVOLlmb0HuJeGppTOX1oxRMzPURZPLolGJo7Is8j.', 'Peter Mwangi ', 'risk_owner', 'Risk & Compliance', NULL, 1, '2025-07-15 11:56:25', '2025-07-15 11:56:35', 'approved', 'IT', NULL),
+(39, 'a_Ivan.andayi', 'a_Ivan.andayi@ke.airtel.com', '$2y$10$6q0m.LqazZyyu7IAiD/GFez3rvZjJBftSfALizBctm1cFXr67swDa', 'Ivan Andayi', 'staff', 'Airtel Money', NULL, 1, '2025-07-29 09:45:09', '2025-07-30 14:52:02', 'approved', NULL, 29),
+(40, 'A_Maurice.Oloo@ke.airtel.com', 'A_Maurice.Oloo@ke.airtel.com', '$2y$10$xVyigCtMXb0Vdq3zecifd.T5RELjFV8EXo3i5REzFSgrZhdC3v7NG', 'Maurice Oloo', 'staff', 'Airtel Money', NULL, 1, '2025-07-29 09:49:17', '2025-07-30 14:51:38', 'approved', NULL, NULL),
+(41, '23188034@airtel.africa', '23188034@airtel.africa', '$2y$10$.FuZgvfoEY7CgwqRSAqZ0.latKA6dSgSVjS2bPE1bWqaXfpsN1J3C', 'Ivan', 'staff', 'Airtel Money', NULL, 1, '2025-07-29 09:25:30', '2025-07-30 09:00:46', 'approved', NULL, NULL),
+(42, 'ndwati', 'ndwati@ke.airtel.com', '$2y$10$xYBuHBKfujvTOK9JBBdYxu.og3lqxettrc0ulE2t6PBK3qumcMvsG', 'Ndwati Samwel', 'staff', 'Airtel Money', NULL, 1, '2025-07-30 08:21:46', '2025-07-30 08:23:15', 'approved', NULL, 29),
+(49, 'usertoday', 'usertoday@ke.airtel.com', '$2y$10$Et26vtwtAi5S1Jmr/ITEVe4sepgEHHb2uA2QVYRMg0xaPVUIkoExS', 'User Today', 'risk_owner', 'Customer Service', NULL, 1, '2025-07-30 10:49:26', '2025-07-30 10:49:59', 'approved', 'Network', NULL),
+(50, 'ysterday', 'ysterday@ke.airtel.com', '$2y$10$ESsIaISjYfB2FLte6Qxxi.rnrAfhKJbxgDI4ApnDkV9DHeMGpQx/C', 'UserYesterday', 'risk_owner', 'Human Resources', NULL, 1, '2025-07-30 10:52:58', '2025-07-30 10:57:39', 'approved', 'Partnerships', NULL);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
