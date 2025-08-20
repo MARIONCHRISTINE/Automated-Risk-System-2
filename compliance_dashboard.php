@@ -1518,6 +1518,29 @@ $riskGroups = detectSimilarRisks($all_risks);
     </div>
     
     <script>
+        function showTab(tabName) {
+            // Hide all tab contents
+            const tabContents = document.querySelectorAll('.tab-content');
+            tabContents.forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Remove active class from all nav items
+            const navItems = document.querySelectorAll('.nav-item a');
+            navItems.forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Show the selected tab content
+            const selectedTab = document.getElementById(tabName);
+            if (selectedTab) {
+                selectedTab.classList.add('active');
+            }
+            
+            // Add active class to the clicked nav item
+            event.target.classList.add('active');
+        }
+
     let riskGroups = <?php echo json_encode($riskGroups); ?>;
     let animationTime = 0;
     let clickableAreas = [];
